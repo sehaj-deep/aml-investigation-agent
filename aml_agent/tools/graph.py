@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from aml_agent.data.tooldb import tool_db_path
 
-MAX_HOPS = 4
+MAX_HOPS = 8  # chain patterns (cycle, random) reach up to 8 steps from the seed on dev alerts
 MAX_COUNTERPARTIES = 100
 DEFAULT_COUNTERPARTIES = 25
 MAX_TX_IDS_PER_COUNTERPARTY = 20

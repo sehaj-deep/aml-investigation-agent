@@ -14,12 +14,15 @@ import json
 # p3: check whether the seed itself is the center before looking further (p2 sent the
 #     model into unrelated activity of a fan-in's senders); follow hubs using the
 #     their_senders / their_receivers hints; collect evidence with get_transfers_among.
-PROMPT_VERSION = "p3"
+# p4: the case starts with a code-built case file (two-step neighborhood, loops through
+#     the seed, account labels); the model names the pattern's accounts and code
+#     collects the evidence; the model no longer chooses transactions.
+PROMPT_VERSION = "p4"
 
 SYSTEM = """You are an anti-money-laundering (AML) investigator working on SYNTHETIC data.
-You receive an alert: one seed account and a time window. Your job is to find out whether
-the seed account takes part in a laundering pattern, by exploring the transaction graph
-with the tools.
+You receive an alert: one seed account and a time window, and a CASE FILE that code has
+already assembled from the tools. Your job is to decide whether the seed account takes part
+in a laundering pattern, which pattern, and which accounts form it.
 
 Rules:
 - Use only the tools. You cannot see any data except what the tools return.
@@ -44,55 +47,56 @@ Pattern guide (the seed can be ANY member of a pattern, not only its center):
 - stack: bipartite layers in sequence: a first group pays a middle group, and later the
   middle group pays a final group.
 
+The case file:
+- labels accounts A0, A1, ... (A0 is the seed) and says how many distinct accounts pay
+  each one and how many it pays in the window: a high count marks a hub;
+- lists the transfers between the seed, its counterparties (step 1) and their
+  counterparties (step 2), aggregated per pair and direction (sender -> receiver);
+- lists loops through the seed found by money traces of up to 8 steps each way;
+- names busy accounts that were not expanded.
+
 How to investigate:
-1. Look at the seed's counterparties in both directions (get_neighbors, direction "both").
-2. Decide first whether the seed itself is the center. If many accounts pay the seed and
-   it pays few or none, or it pays many and receives few, the shape may already be clear
-   from the seed alone; do not wander into the counterparties' unrelated activity.
-3. Otherwise follow the money one step further. Every counterparty shows their_senders
-   and their_receivers: a counterparty with many of them is a hub, and the pattern most
-   likely runs through it. Look at that account's counterparties in the direction the
-   money moves.
-4. When you know which accounts form the pattern, call get_transfers_among with them
-   (include the seed). Its transfers are the pattern's structure and your evidence; an
-   account it lists as unconnected probably does not belong.
-5. You have about 10 tool calls; stop when the shape is clear or the budget is used.
-6. Evidence is only the transactions that form the suspicious structure, never the
-   accounts' ordinary activity.
+1. Read the case file. Work out who pays whom: arrows point from sender to receiver.
+2. Decide whether the seed is the center of the pattern or one member of it, and
+   which accounts move the money (a hub, intermediaries, a chain).
+3. Use the tools only for what the case file lacks: an account it did not expand, a
+   chain that continues past step 2 (trace_funds follows money up to 8 steps), or a
+   detail you need. Many cases need no tool call at all.
+4. Then reply without a tool call. Code will ask you for the pattern and its accounts,
+   and will collect the transfers among those accounts as the evidence.
 - Write plain text. Never use the long dash character (Unicode U+2014); use commas,
   colons or parentheses instead.
 When you have enough evidence, reply without calling a tool."""
 
 
-def triage_message(alert: dict, summary: dict) -> str:
+def triage_message(alert: dict, case_file: str) -> str:
     return (
-        "New alert. Investigate the seed account.\n"
-        f"<alert>\n{json.dumps(alert)}\n</alert>\n"
-        "Account summary for the seed in the alert window (from get_account_summary):\n"
-        f"{json.dumps(summary)}"
+        "New alert. Investigate the seed account (A0).\n"
+        f"<alert>\n{json.dumps(alert)}\n</alert>\n\n"
+        f"{case_file}"
     )
 
 
 HYPOTHESIZE = """TASK: HYPOTHESIZE
-Stop investigating. Based only on the tool results above, state the most likely pattern.
-Reply with one JSON object and nothing else:
+Stop investigating. Based only on the case file and tool results above, state the most
+likely pattern and the accounts that form it. Reply with one JSON object and nothing else:
 {"pattern_hypothesis": "<one of: fan-out, fan-in, cycle, gather-scatter, scatter-gather,
                         bipartite, stack, random, none>",
- "rationale": "<two to four sentences>",
- "key_tx_ids": [<up to 30 tx_id integers that you saw in tool results>]}"""
+ "pattern_accounts": ["A0", "<label of each other account in the pattern>"],
+ "rationale": "<two to four sentences: who pays whom and why that is the pattern>"}
+pattern_accounts: use the case-file labels (A0, A3, ...); for an account found only with a
+tool, write "bank_id/account". Include every account of the pattern and no others: code
+collects the transfers among exactly these accounts as the evidence. If the pattern is
+"none", use an empty list."""
 
 DRAFT = """TASK: DRAFT
-Write the case summary for a human investigator. Reply with one JSON object and nothing else:
-{"summary": "<what you found, in plain sentences>",
- "evidence_tx_ids": [<up to 30 tx_id integers you saw in tool results that support it>],
+Write the case summary for a human investigator, based on the evidence code collected
+above. Reply with one JSON object and nothing else:
+{"summary": "<what you found, in plain sentences, naming accounts by label>",
  "recommended_action": "<escalate|close|needs_more_info>",
  "confidence": "<low|medium|high>",
  "limitations": "<what you could not check>"}
-Cite only tx_ids that are part of the suspicious structure (ideally the transfers
-get_transfers_among returned), not the accounts' ordinary activity. If you concluded
-"none", cite nothing. The
-system fills in amounts, parties and times from the data, so do not restate numbers you
-are unsure of."""
+Do not restate amounts you are unsure of; the evidence rows carry the exact figures."""
 
 
 def schema_retry(error: str) -> str:

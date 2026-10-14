@@ -173,3 +173,17 @@ def test_request_more_reinvestigates_then_round_limit(tool_dir):
     assert third.values["review_round"] == 2
     assert any("review-round limit" in w for w in third.values["warnings"])
     assert out["status"] == "approved"
+
+
+def test_evidence_is_the_transfers_among_the_named_accounts(tool_dir):
+    paused = run(tool_dir, "basic", start)
+    named = paused.values["hypothesis"]["pattern_accounts"]
+    aliases = paused.values["aliases"]
+    accounts = {(aliases[n][0], aliases[n][1]) for n in named}
+    evidence = paused.values["case"]["evidence"]
+    assert evidence
+    for e in evidence:
+        assert (int(e["from_bank"]), e["from_account"]) in accounts
+        assert (int(e["to_bank"]), e["to_account"]) in accounts
+    assert [e["tx_id"] for e in evidence] == paused.values["cited_tx_ids"]
+    assert paused.values["verification"] is None or paused.values["verification"]["faithful"]

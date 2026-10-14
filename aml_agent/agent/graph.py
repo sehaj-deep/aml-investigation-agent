@@ -1,14 +1,21 @@
 """The investigation workflow (FR-3).
 
-    triage -> agent <-> tools -> hypothesize -> draft -> verify -> human_review -> finalize
-                ^                                                      |
-                +------------------- request_more ---------------------+
+    triage -> agent <-> tools -> hypothesize -> collect_evidence -> draft -> verify
+                ^                                                            |
+                +-- request_more <-- human_review <--------------------------+
+                                          |
+                                          +--> finalize
 
-- triage (code): fetches the seed's account summary through MCP.
-- agent / tools: the LLM tool loop. Hard limits on steps, tool calls and tokens.
-- hypothesize, draft (LLM): JSON replies validated with Pydantic, one retry each.
-  The model names tx_ids; code fetches the evidence rows through MCP, so the model
-  never writes amounts, parties or times (FR-3: no lookups the code can do).
+- triage (code): builds the case file through MCP (aml_agent/agent/casefile.py):
+  the seed's summary, its two-step neighborhood and loops through the seed.
+- agent / tools: the LLM tool loop for anything the case file lacks. Hard limits
+  on steps, tool calls and tokens.
+- hypothesize (LLM): the pattern and the accounts that form it (by case-file label).
+- collect_evidence (code): the transfers among those accounts (get_transfers_among)
+  become the evidence, so the model never picks transactions, amounts, parties or
+  times (FR-3: no lookups the code can do).
+- draft (LLM): the narrative, action and confidence, written with the evidence in view.
+  JSON replies are validated with Pydantic, one retry each.
 - verify (code): checks every cited tx_id and evidence row against the data
   (FR-7); failures become visible warnings before review.
 - human_review: LangGraph interrupt. Resumes only with a validated Decision.
@@ -30,6 +37,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, ValidationError
 
 from aml_agent.agent import prompts
+from aml_agent.agent.casefile import build_case_file, resolve_accounts
 from aml_agent.instrument import (
     InstrumentedClient,
     InstrumentedProvider,
@@ -42,6 +50,7 @@ from aml_agent.tools.client import GraphClient
 
 EM_DASH = chr(0x2014)
 MAX_TOOL_CONTENT_CHARS = 12_000
+MAX_EVIDENCE_ROWS = 60  # the largest dev pattern has 30 transfers
 
 
 @dataclass(frozen=True)
@@ -65,6 +74,9 @@ class CaseState(TypedDict, total=False):
     messages: list[dict]
     tool_log: list[dict]
     seen_tx_ids: list[int]
+    seen_accounts: list[list]
+    aliases: dict[str, list]
+    evidence_rows: list[dict]
     steps: int
     tool_calls: int
     round_steps: int
@@ -101,6 +113,25 @@ def _collect_tx_ids(obj: Any, out: list[int]) -> None:
             _collect_tx_ids(v, out)
 
 
+def _collect_accounts(obj: Any, out: list[list]) -> None:
+    """Every (bank_id, account) a tool result mentions."""
+    if isinstance(obj, dict):
+        for bank_key, acct_key in (
+            ("bank_id", "account"),
+            ("from_bank", "from_account"),
+            ("to_bank", "to_account"),
+        ):
+            if isinstance(obj.get(bank_key), int) and isinstance(obj.get(acct_key), str):
+                pair = [obj[bank_key], obj[acct_key]]
+                if pair not in out:
+                    out.append(pair)
+        for v in obj.values():
+            _collect_accounts(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            _collect_accounts(v, out)
+
+
 def _extract_json(text: str) -> str:
     """The first {...} block in a reply (models sometimes wrap JSON in prose or fences)."""
     match = re.search(r"\{.*\}", text, re.S)
@@ -130,35 +161,20 @@ def build_graph(
 
     async def triage(state: CaseState) -> CaseState:
         alert = state["alert"]
-        args = {
-            "bank_id": alert["seed_bank"],
-            "account": alert["seed_account"],
-            "window_start": alert["window_start"],
-            "window_end": alert["window_end"],
-        }
-        result = await client.call("get_account_summary", args)
-        summary = result.content if result.ok else {"error": result.error}
-        seen: list[int] = []
+        case_file = await build_case_file(client, alert)
         return {
             "provider": provider.provider,
             "model": provider.model,
             "prompt_version": prompts.PROMPT_VERSION,
             "messages": [
                 {"role": "system", "content": prompts.SYSTEM},
-                {"role": "user", "content": prompts.triage_message(alert, summary)},
+                {"role": "user", "content": prompts.triage_message(alert, case_file.text)},
             ],
-            "tool_log": [
-                {
-                    "by": "system",
-                    "step": 0,
-                    "name": "get_account_summary",
-                    "arguments": args,
-                    "ok": result.ok,
-                    "error": result.error,
-                    "duration_ms": round(result.duration_ms, 1),
-                }
-            ],
-            "seen_tx_ids": seen,
+            "tool_log": case_file.tool_log,
+            "seen_tx_ids": case_file.seen_tx_ids,
+            "seen_accounts": [list(a) for a in case_file.seen_accounts],
+            "aliases": {k: list(v) for k, v in case_file.aliases.items()},
+            "evidence_rows": [],
             "steps": 0,
             "tool_calls": 0,
             "round_steps": 0,
@@ -213,6 +229,7 @@ def build_graph(
         messages = list(state["messages"])
         log = list(state["tool_log"])
         seen = list(state["seen_tx_ids"])
+        accounts = [list(a) for a in state.get("seen_accounts", [])]
         n_calls, round_calls = state["tool_calls"], state["round_tool_calls"]
         invalid = state["invalid_tool_calls"]
         for call in messages[-1]["tool_calls"]:
@@ -237,6 +254,7 @@ def build_graph(
                 result = await client.call(call["name"], call["arguments"])
                 if result.ok:
                     _collect_tx_ids(result.content, seen)
+                    _collect_accounts(result.content, accounts)
                     content = json.dumps(result.content)
                     if len(content) > MAX_TOOL_CONTENT_CHARS:
                         content = (
@@ -265,6 +283,7 @@ def build_graph(
             "messages": messages,
             "tool_log": log,
             "seen_tx_ids": list(dict.fromkeys(seen)),
+            "seen_accounts": accounts,
             "tool_calls": n_calls,
             "round_tool_calls": round_calls,
             "invalid_tool_calls": invalid,
@@ -323,6 +342,91 @@ def build_graph(
             "warnings": warnings,
         }
 
+    async def collect_evidence(state: CaseState) -> CaseState:
+        hypothesis = state.get("hypothesis") or {}
+        warnings = list(state["warnings"])
+        alert = state["alert"]
+        seed = (alert["seed_bank"], alert["seed_account"])
+        aliases = {k: (v[0], v[1]) for k, v in state.get("aliases", {}).items()}
+        label = {acc: alias for alias, acc in aliases.items()}
+        names = hypothesis.get("pattern_accounts") or []
+        if hypothesis.get("pattern_hypothesis", "none") == "none" or not names:
+            note = "No pattern was named, so code collected no evidence."
+            return {
+                "evidence_rows": [],
+                "messages": [*state["messages"], {"role": "user", "content": note}],
+            }
+        known = {(a[0], a[1]) for a in state.get("seen_accounts", [])} | {seed}
+        accounts, problems = resolve_accounts(names, aliases, known)
+        warnings.extend(f"EVIDENCE: {p}" for p in problems)
+        if seed not in accounts:
+            accounts.insert(0, seed)
+        log = list(state["tool_log"])
+        rows: list[dict] = []
+        unconnected: list[str] = []
+        if len(accounts) < 2:
+            warnings.append("EVIDENCE: fewer than two usable accounts were named")
+        else:
+            args = {
+                "accounts": [{"bank_id": b, "account": a} for b, a in accounts],
+                "window_start": alert["window_start"],
+                "window_end": alert["window_end"],
+                "limit": 300,
+            }
+            result = await client.call("get_transfers_among", args)
+            log.append(
+                {
+                    "by": "system",
+                    "step": state["steps"],
+                    "name": "get_transfers_among",
+                    "arguments": args,
+                    "ok": result.ok,
+                    "error": result.error,
+                    "duration_ms": round(result.duration_ms, 1),
+                    "executed": True,
+                }
+            )
+            if result.ok:
+                rows = result.content["transfers"]
+                if len(rows) > MAX_EVIDENCE_ROWS or result.content["truncated"]:
+                    warnings.append(
+                        f"EVIDENCE: {result.content['total_transfers']} transfers among the "
+                        f"named accounts; the first {MAX_EVIDENCE_ROWS} are kept"
+                    )
+                    rows = rows[:MAX_EVIDENCE_ROWS]
+                unconnected = [
+                    label.get((u["bank_id"], u["account"]), f"{u['bank_id']}/{u['account']}")
+                    for u in result.content["unconnected_accounts"]
+                ]
+                if unconnected:
+                    warnings.append(
+                        f"EVIDENCE: named accounts with no transfer to the others: {unconnected}"
+                    )
+            else:
+                warnings.append(f"EVIDENCE: lookup failed: {result.error}")
+
+        def name(bank: int, acct: str) -> str:
+            return label.get((bank, acct), f"{bank}/{acct}")
+
+        lines = [f"Evidence collected by code: {len(rows)} transfers among the accounts you named."]
+        lines += [
+            f"tx {r['tx_id']}: {name(r['from_bank'], r['from_account'])} -> "
+            f"{name(r['to_bank'], r['to_account'])}, {r['amount_paid']} {r['currency_paid']}, "
+            f"{r['ts']}"
+            for r in rows
+        ]
+        if unconnected:
+            lines.append(f"Named but not connected to the others: {', '.join(unconnected)}.")
+        return {
+            "evidence_rows": rows,
+            "tool_log": log,
+            "seen_tx_ids": list(
+                dict.fromkeys([*state["seen_tx_ids"], *(r["tx_id"] for r in rows)])
+            ),
+            "warnings": warnings,
+            "messages": [*state["messages"], {"role": "user", "content": "\n".join(lines)}],
+        }
+
     async def draft(state: CaseState) -> CaseState:
         parsed, update = await _structured(state, prompts.DRAFT, DraftReply)
         warnings = list(state["warnings"])
@@ -331,52 +435,27 @@ def build_graph(
             warnings.append("MODEL_OUTPUT_INVALID: draft reply failed validation twice")
             reply = DraftReply(
                 summary="The model did not produce a valid case draft.",
-                evidence_tx_ids=[],
                 recommended_action="needs_more_info",
                 confidence="low",
                 limitations="No valid model output; a human must investigate.",
             )
         else:
             reply = parsed
-        cited = list(dict.fromkeys(reply.evidence_tx_ids))
-        seen = set(state["seen_tx_ids"])
-        unseen = [t for t in cited if t not in seen]
-        if unseen:
-            warnings.append(f"cited tx_ids never returned by a tool: {unseen}")
-        evidence: list[Evidence] = []
-        log = list(state["tool_log"])
-        if cited:
-            result = await client.call("get_transactions", {"tx_ids": cited})
-            log.append(
-                {
-                    "by": "system",
-                    "step": state["steps"],
-                    "name": "get_transactions",
-                    "arguments": {"tx_ids": cited},
-                    "ok": result.ok,
-                    "error": result.error,
-                    "duration_ms": round(result.duration_ms, 1),
-                    "executed": True,
-                }
+        evidence = [
+            Evidence(
+                tx_id=r["tx_id"],
+                from_bank=str(r["from_bank"]),
+                from_account=r["from_account"],
+                to_bank=str(r["to_bank"]),
+                to_account=r["to_account"],
+                amount_paid=r["amount_paid"],
+                currency_paid=r["currency_paid"],
+                timestamp=r["ts"],
             )
-            if result.ok:
-                if result.content["not_found"]:
-                    warnings.append(f"cited tx_ids not in the data: {result.content['not_found']}")
-                for r in result.content["transactions"]:
-                    evidence.append(
-                        Evidence(
-                            tx_id=r["tx_id"],
-                            from_bank=str(r["from_bank"]),
-                            from_account=r["from_account"],
-                            to_bank=str(r["to_bank"]),
-                            to_account=r["to_account"],
-                            amount_paid=r["amount_paid"],
-                            currency_paid=r["currency_paid"],
-                            timestamp=r["timestamp"],
-                        )
-                    )
-            else:
-                warnings.append(f"evidence lookup failed: {result.error}")
+            for r in state.get("evidence_rows", [])
+        ]
+        cited = [e.tx_id for e in evidence]
+        log = list(state["tool_log"])
         case = Case(
             case_id=state["case_id"],
             pattern_hypothesis=hypothesis["pattern_hypothesis"] if hypothesis else "none",
@@ -461,6 +540,7 @@ def build_graph(
         "agent": agent,
         "tools": tools,
         "hypothesize": hypothesize,
+        "collect_evidence": collect_evidence,
         "draft": draft,
         "verify": verify,
         "human_review": human_review,
@@ -472,7 +552,8 @@ def build_graph(
     g.add_edge("triage", "agent")
     g.add_conditional_edges("agent", after_agent, ["tools", "hypothesize"])
     g.add_conditional_edges("tools", after_tools, ["agent", "hypothesize"])
-    g.add_edge("hypothesize", "draft")
+    g.add_edge("hypothesize", "collect_evidence")
+    g.add_edge("collect_evidence", "draft")
     g.add_edge("draft", "verify")
     g.add_edge("verify", "human_review")
     g.add_conditional_edges(

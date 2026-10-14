@@ -16,7 +16,6 @@ Policies (LLM_SCRIPT_POLICY):
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import re
@@ -35,27 +34,12 @@ def _alert(messages: list[dict]) -> dict:
     raise ValueError("no alert in conversation")
 
 
-def _seen_tx_ids(messages: list[dict]) -> list[int]:
-    seen: list[int] = []
-
-    def walk(obj: Any) -> None:
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                if k == "tx_id" and isinstance(v, int):
-                    seen.append(v)
-                elif k == "tx_ids" and isinstance(v, list):
-                    seen.extend(x for x in v if isinstance(x, int))
-                else:
-                    walk(v)
-        elif isinstance(obj, list):
-            for v in obj:
-                walk(v)
-
+def _labels(messages: list[dict]) -> list[str]:
+    """Case-file account labels (A0, A1, ...) in the order the case file lists them."""
     for m in messages:
-        if m["role"] == "tool":
-            with contextlib.suppress(json.JSONDecodeError):
-                walk(json.loads(m["content"]))
-    return list(dict.fromkeys(seen))
+        if m["role"] == "user" and "CASE FILE" in m["content"]:
+            return re.findall(r"^(A\d+) = ", m["content"], re.M)
+    return []
 
 
 def _phase(messages: list[dict]) -> str:
@@ -131,27 +115,25 @@ class ScriptedProvider:
         if self.policy == "bad_json" and not self._bad_json_sent:
             self._bad_json_sent = True
             return ChatResponse(content="I think this is a fan-out pattern.")
-        seen = _seen_tx_ids(messages)
-        pattern = "none" if self.policy == "none" else "fan-out"
+        none = self.policy == "none"
+        labels = _labels(messages)
         return ChatResponse(
             content=json.dumps(
                 {
-                    "pattern_hypothesis": pattern,
+                    "pattern_hypothesis": "none" if none else "fan-out",
+                    "pattern_accounts": [] if none else labels[:3],
                     "rationale": "Scripted rationale based on the counterparties found.",
-                    "key_tx_ids": seen[:3],
                 }
             )
         )
 
     def _draft(self, messages: list[dict]) -> ChatResponse:
-        seen = _seen_tx_ids(messages)
         dash = f" {EM_DASH} " if self.policy == "emdash" else ", "
         none = self.policy == "none"
         return ChatResponse(
             content=json.dumps(
                 {
                     "summary": f"Scripted summary{dash}the seed account was reviewed.",
-                    "evidence_tx_ids": [] if none else seen[:5],
                     "recommended_action": "close" if none else "escalate",
                     "confidence": "low",
                     "limitations": "Scripted output for harness testing; not a model result.",

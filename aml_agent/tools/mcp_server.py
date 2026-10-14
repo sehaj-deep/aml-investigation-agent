@@ -92,7 +92,7 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
         max_edges: int = 100,
     ) -> dict:
         """Follow money out of an account ("forward" or "out") or back to where it came from
-        ("backward" or "in") for up to 4 hops, keeping
+        ("backward" or "in") for up to 8 hops, keeping
         time order. Returns the transfers found, with hop numbers. At most 300 edges and 20
         transfers per account per hop."""
         return tools().trace_funds(

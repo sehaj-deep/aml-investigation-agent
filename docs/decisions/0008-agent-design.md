@@ -24,3 +24,14 @@ Live runs on dev alerts showed the small model missing hub accounts and citing t
 - `get_neighbors` reports, for each counterparty, `their_senders` and `their_receivers` (distinct accounts it is paid by and pays in the window), so a hub stands out without one lookup per account.
 - `get_transfers_among(accounts, window)` returns only transfers whose sender and receiver are both in a chosen group (2 to 30 accounts, at most 300 transfers), plus group accounts with no link to the rest. The agent uses it to collect a pattern's own transfers as evidence.
 Both are read-only, bounded and validated like the other tools.
+
+## Update 2026-10-14: code-built case file and code-collected evidence (prompt p4)
+
+Measured on the 24 dev positives before building (no model involved): 84% of each pattern's transactions are connected to the seed at all (bipartite and stack blocks are often disjoint pieces); the seed's two-step neighborhood holds 75%; a perfect choice of pattern accounts followed by `get_transfers_among` gives 100% coverage at 92% precision.
+
+So exploration and evidence collection moved into code, leaving the model the judgment:
+- **Case file (triage).** Code builds it through the same MCP tools and audit trail: seed summary, step-1 counterparties, step-2 counterparties of every step-1 account with at most 40 counterparties (up to 25 expansions), and loops through the seed found by 8-step forward and backward traces (an account the seed's money reaches that earlier sent money reaching the seed). Accounts get labels A0 (seed), A1, ... Median size about 600 tokens, at most about 2,900 on dev alerts; it holds 77% of each dev pattern on average.
+- **Hypothesis.** The model returns the pattern and `pattern_accounts` (labels, "bank/account" or objects). Accounts no tool ever returned are dropped with a warning.
+- **collect_evidence (new code node).** Evidence is the transfers among the named accounts plus the seed in the alert window (at most 60 rows), shown to the model before it drafts.
+- **Draft.** Narrative, action, confidence and limitations only.
+- Trace hop cap raised from 4 to 8 (chain patterns reach 8 steps on dev alerts).

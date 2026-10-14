@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,19 +33,25 @@ class _Strict(BaseModel):
 
 class HypothesisReply(_Strict):
     pattern_hypothesis: PatternType
+    # Accounts that form the pattern: case-file labels ("A3"), "bank_id/account"
+    # strings, or {"bank_id": ..., "account": ...}. Code collects the evidence from them.
+    pattern_accounts: list[str | dict[str, Any]] = Field(
+        default_factory=list, max_length=MAX_EVIDENCE
+    )
     rationale: str = Field(min_length=1, max_length=2000)
-    key_tx_ids: list[int] = Field(default_factory=list, max_length=MAX_EVIDENCE)
 
 
 class DraftReply(_Strict):
     summary: str = Field(min_length=1, max_length=4000)
-    evidence_tx_ids: list[int] = Field(default_factory=list, max_length=MAX_EVIDENCE)
+    # Evidence is collected by code from the hypothesis accounts; IDs the model may still
+    # list here are accepted and ignored.
+    evidence_tx_ids: list[int] = Field(default_factory=list, max_length=100)
     recommended_action: Action
     confidence: Confidence
     limitations: str = Field(min_length=1, max_length=2000)
 
 
-# The case (FR-4). Evidence rows are filled by code from get_transactions.
+# The case (FR-4). Evidence rows are filled by code from get_transfers_among.
 
 
 class Evidence(_Strict):
