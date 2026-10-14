@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "seed": 20261014,
+  "dev_per_type": 3,
+  "eval_per_type": 5,
+  "window_padding_hours": 24.0,
+  "source_seed_eligible_sha256": "ef843d40cc250159afa0a931eeab38c7ad6db29d169971e83cf7a5c2cce612d9",
+  "files": {
+    "dev.jsonl": "2dec0c0337cae2d7444046b6d9486157bef0cff676f4b768ae9b0b337431e257",
+    "ground_truth/dev.jsonl": "8ab000aab43f7435dc9bf4d01fe7ab4810c71e92a1e66107278ed5b73b30e007",
+    "eval.jsonl": "f1f31d310e57f9501f523741a4042091091d28ef1b00b3519dd0c58ed2ed2124",
+    "ground_truth/eval.jsonl": "b53da643a7863ebea42413eeb769cc8dfbaab8a98b55268a1eb09d21b1d3e533"
+  }
+}
