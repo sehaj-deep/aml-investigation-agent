@@ -1,0 +1,32 @@
+# Data: never commit the dataset or derived files (CDLA-Sharing 1.0)
+data/
+*.csv
+*.parquet
+*.duckdb
+*.duckdb.wal
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
