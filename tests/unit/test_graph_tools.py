@@ -147,3 +147,26 @@ def test_rows_after_primary_period_hidden_by_default(tools, monkeypatch):
     assert tools.get_transactions(tx_ids=[late_id])["transactions"][0]["tx_id"] == late_id
     out = tools.get_account_summary(**SEED)
     assert "Swiss Franc" in {s["currency"] for s in out["sent"]}
+
+
+def test_neighbors_in_direction_only(tools):
+    out = tools.get_neighbors(**SEED, **WINDOW, direction="in")
+    assert out["direction"] == "in"
+    assert {c["direction"] for c in out["counterparties"]} == {"in"}
+    assert "HOP00001" in {c["account"] for c in out["counterparties"]}
+
+
+@pytest.mark.parametrize(("given", "expected"), [("backward", "in"), ("forward", "out")])
+def test_neighbor_direction_aliases(tools, given, expected):
+    assert tools.get_neighbors(**SEED, **WINDOW, direction=given)["direction"] == expected
+
+
+@pytest.mark.parametrize(("given", "expected"), [("in", "backward"), ("out", "forward")])
+def test_trace_direction_aliases(tools, given, expected):
+    assert tools.trace_funds(**SEED, **WINDOW, direction=given)["direction"] == expected
+
+
+def test_neighbors_both_reports_requested_direction(tools):
+    out = tools.get_neighbors(**SEED, **WINDOW, direction="both")
+    assert out["direction"] == "both"
+    assert {c["direction"] for c in out["counterparties"]} == {"in", "out"}

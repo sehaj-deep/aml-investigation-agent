@@ -61,11 +61,12 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
         account: str,
         window_start: datetime | None = None,
         window_end: datetime | None = None,
-        direction: Literal["in", "out", "both"] = "both",
+        direction: Literal["in", "out", "both", "forward", "backward"] = "both",
         limit: int = 25,
         include_self_transfers: bool = False,
     ) -> dict:
-        """Counterparties of an account in a time window (most active first), each with
+        """Counterparties of an account in a time window (most active first). direction:
+        "in" (who sent money to it), "out" (who it paid) or "both". Each comes with
         per-currency totals, first and last time and up to 20 tx_ids. At most 100
         counterparties."""
         return tools().get_neighbors(
@@ -84,11 +85,12 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
         account: str,
         window_start: datetime | None = None,
         window_end: datetime | None = None,
-        direction: Literal["forward", "backward"] = "forward",
+        direction: Literal["forward", "backward", "out", "in"] = "forward",
         hops: int = 2,
         max_edges: int = 100,
     ) -> dict:
-        """Follow money from (forward) or to (backward) an account for up to 4 hops, keeping
+        """Follow money out of an account ("forward" or "out") or back to where it came from
+        ("backward" or "in") for up to 4 hops, keeping
         time order. Returns the transfers found, with hop numbers. At most 300 edges and 20
         transfers per account per hop."""
         return tools().trace_funds(

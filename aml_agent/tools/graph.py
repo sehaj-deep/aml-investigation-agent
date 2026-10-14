@@ -80,14 +80,25 @@ class SummaryArgs(AccountArgs):
     pass
 
 
+# Models mix up the two direction vocabularies, so each tool accepts both and
+# normalizes: in = backward (money arriving), out = forward (money leaving).
+NEIGHBOR_DIRECTIONS = {"in": "in", "backward": "in", "out": "out", "forward": "out", "both": "both"}
+TRACE_DIRECTIONS = {
+    "forward": "forward",
+    "out": "forward",
+    "backward": "backward",
+    "in": "backward",
+}
+
+
 class NeighborArgs(AccountArgs):
-    direction: Literal["in", "out", "both"] = "both"
+    direction: Literal["in", "out", "both", "forward", "backward"] = "both"
     limit: int = Field(default=DEFAULT_COUNTERPARTIES, ge=1)
     include_self_transfers: bool = False
 
 
 class TraceArgs(AccountArgs):
-    direction: Literal["forward", "backward"] = "forward"
+    direction: Literal["forward", "backward", "out", "in"] = "forward"
     hops: int = Field(default=2, ge=1)
     max_edges: int = Field(default=100, ge=1)
 
@@ -204,22 +215,23 @@ class GraphTools:
     def get_neighbors(self, **kwargs: Any) -> dict[str, Any]:
         """Counterparties of an account in a window, with per-currency totals and tx_ids."""
         args = NeighborArgs(**kwargs)
+        direction = NEIGHBOR_DIRECTIONS[args.direction]
         capped: dict = {}
         start, end = self._window(args, capped)
         limit = self._cap(capped, "limit", args.limit, MAX_COUNTERPARTIES)
         self_filter = "" if args.include_self_transfers else "AND NOT is_self_transfer"
         legs = []
-        if args.direction in ("out", "both"):
+        if direction in ("out", "both"):
             legs.append(
                 f"""SELECT 'out' AS direction, to_bank AS cp_bank, to_account AS cp_account,
                        tx_id, ts, currency_paid AS currency, amount_paid AS amount
                     FROM transactions WHERE from_bank = $bank AND from_account = $acct
                       AND ts BETWEEN $start AND $end {self_filter}"""
             )
-        if args.direction in ("in", "both"):
+        if direction in ("in", "both"):
             legs.append(
-                f"""SELECT 'in', from_bank, from_account, tx_id, ts,
-                       currency_received, amount_received
+                f"""SELECT 'in' AS direction, from_bank AS cp_bank, from_account AS cp_account,
+                       tx_id, ts, currency_received AS currency, amount_received AS amount
                     FROM transactions WHERE to_bank = $bank AND to_account = $acct
                       AND ts BETWEEN $start AND $end {self_filter}"""
             )
@@ -259,10 +271,10 @@ class GraphTools:
         ).fetchall()
         total = rows[0][8] if rows else 0
         counterparties = []
-        for direction, cp_bank, cp_account, n_tx, first_ts, last_ts, tx_ids, totals, _ in rows:
+        for leg, cp_bank, cp_account, n_tx, first_ts, last_ts, tx_ids, totals, _ in rows:
             counterparties.append(
                 {
-                    "direction": direction,
+                    "direction": leg,
                     "bank_id": cp_bank,
                     "account": cp_account,
                     **self._bank(cp_bank),
@@ -280,7 +292,7 @@ class GraphTools:
         return {
             "account": {"bank_id": args.bank_id, "account": args.account},
             "window": {"start": _ts(start), "end": _ts(end)},
-            "direction": args.direction,
+            "direction": direction,
             "counterparties": counterparties,
             "total_counterparties": total,
             "truncated": total > len(counterparties),
@@ -295,7 +307,8 @@ class GraphTools:
         start, end = self._window(args, capped)
         hops = self._cap(capped, "hops", args.hops, MAX_HOPS)
         max_edges = self._cap(capped, "max_edges", args.max_edges, MAX_TRACE_EDGES)
-        forward = args.direction == "forward"
+        direction = TRACE_DIRECTIONS[args.direction]
+        forward = direction == "forward"
         here_bank, here_acct, there_bank, there_acct = (
             ("from_bank", "from_account", "to_bank", "to_account")
             if forward
@@ -368,7 +381,7 @@ class GraphTools:
             frontier = [(b, a, t) for (b, a), t in sorted(next_frontier.items())]
         return {
             "start": {"bank_id": args.bank_id, "account": args.account},
-            "direction": args.direction,
+            "direction": direction,
             "window": {"start": _ts(start), "end": _ts(end)},
             "hops_requested": args.hops,
             "hops_applied": hops,
