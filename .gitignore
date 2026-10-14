@@ -30,3 +30,7 @@ htmlcov/
 Thumbs.db
 .vscode/
 .idea/
+
+# Scripted-provider runs are harness checks, never results
+evals/runs/**/scripted-*.json
+evals/runs/**/bakeoff-scripted-*.json
