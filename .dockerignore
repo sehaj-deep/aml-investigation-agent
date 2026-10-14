@@ -1,0 +1,10 @@
+.git
+.venv
+data
+evals
+tests
+docs
+**/__pycache__
+.env
+.env.*
+NOTES_FOR_YOU.md

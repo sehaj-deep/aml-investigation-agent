@@ -1,0 +1,35 @@
+name: aml-agent
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aml}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-aml}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 1g
+    restart: unless-stopped
+
+  # Tool-query latency benchmark over the real Parquet files (Sprint 0 Verify).
+  bench:
+    profiles: ["bench"]
+    build: .
+    environment:
+      PARQUET_DIR: /data/parquet
+    volumes:
+      - ./data/parquet:/data/parquet:ro
+    command: ["python", "scripts/bench_neighbors.py", "--n", "1000"]
+    mem_limit: 3g
+
+volumes:
+  pgdata:

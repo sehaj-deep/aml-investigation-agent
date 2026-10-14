@@ -39,7 +39,15 @@ Portfolio project: a LangGraph agent that investigates synthetic anti-money-laun
 - Python 3.11 or newer, type hints, Pydantic for schemas, ruff and pytest, small commits.
 
 ## Commands
-Fill these in as they are created: `make test`, `make lint`, `docker compose up`.
+Activate the venv first (`.venv/Scripts/activate`). `make` is not installed on this machine yet; the command after each target is what it runs.
+- `make install`: `pip install -r requirements.txt -r requirements-dev.txt`, `pip install --no-deps -e .`, `pre-commit install`
+- `make lint`: `ruff check .` and `ruff format --check .`
+- `make test`: `python -m pytest -m "not data and not docker"` (what CI runs)
+- `make test-data`: `python -m pytest -m data` (golden numbers; needs Parquet)
+- `make convert`: `python scripts/convert_to_parquet.py` (about 100 s)
+- `make alerts`: `python scripts/build_alerts.py`
+- `make up` / `make down`: `docker compose up -d --wait` / `docker compose down`
+- `make latency`: `docker compose --profile bench run --rm bench`
 
 ## Definition of done for a sprint
 1. The sprint's **Verify** checks in the PRD have been run and the output shown to me, not only written as tests.
