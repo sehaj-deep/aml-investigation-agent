@@ -34,3 +34,5 @@ Thumbs.db
 # Scripted-provider runs are harness checks, never results
 evals/runs/**/scripted-*.json
 evals/runs/**/bakeoff-scripted-*.json
+# Debug dumps hold tool outputs (transaction rows): never commit
+evals/runs/**/debug/

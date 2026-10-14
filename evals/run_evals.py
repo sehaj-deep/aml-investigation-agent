@@ -64,9 +64,15 @@ def block_tx_ids(con, block_id: int) -> set[int]:
     return {r[0] for r in rows}
 
 
-async def run_set(name: str, limit: int | None) -> list[dict]:
+async def run_set(
+    name: str, limit: int | None, only: list[str] | None = None, debug_dir: Path | None = None
+) -> list[dict]:
     alerts = {a.alert_id: a for a in read_alerts(name)}
-    truth = read_truth(name)[:limit] if limit else read_truth(name)
+    truth = read_truth(name)
+    if only:
+        truth = [t for t in truth if t.alert_id in only]
+    if limit:
+        truth = truth[:limit]
     con = connect()
     verifier = CitationVerifier(con)
     provider = get_provider()
@@ -89,10 +95,19 @@ async def run_set(name: str, limit: int | None) -> list[dict]:
             case = values.get("case") or {}
             ver = values.get("verification") or {}
             evidence_ids = {e["tx_id"] for e in case.get("evidence", [])}
-            coverage = None
+            seen_ids = set(values.get("seen_tx_ids", []))
+            coverage = seen_coverage = precision = None
+            block: set[int] = set()
             if t.label == "positive":
                 block = block_tx_ids(con, t.block_id)
                 coverage = round(len(evidence_ids & block) / len(block), 4)
+                # Share of the pattern the agent's tools returned at some point. Low
+                # coverage with high seen_coverage means it found but did not cite.
+                seen_coverage = round(len(seen_ids & block) / len(block), 4)
+                # Share of the cited evidence that belongs to the pattern. Coverage alone
+                # rewards citing everything; precision penalizes it.
+                if evidence_ids:
+                    precision = round(len(evidence_ids & block) / len(evidence_ids), 4)
             expected = PATTERN_NAMES.get(t.pattern_type or "", "none")
             rows.append(
                 {
@@ -106,6 +121,11 @@ async def run_set(name: str, limit: int | None) -> list[dict]:
                     "faithful": ver.get("faithful"),
                     "grounded": ver.get("grounded"),
                     "evidence_coverage": coverage,
+                    "seen_coverage": seen_coverage,
+                    "evidence_precision": precision,
+                    "block_size": len(block) or None,
+                    "cited": len(values.get("cited_tx_ids", [])),
+                    "evidence_rows": len(evidence_ids),
                     "wall_ms": round(wall_ms, 1),
                     "error": error,
                     # Rejected or failed agent tool calls, for debugging tool-call validity.
@@ -117,6 +137,12 @@ async def run_set(name: str, limit: int | None) -> list[dict]:
                     **(case_metrics(values) if values else {}),
                 }
             )
+            if debug_dir is not None:
+                debug_dir.mkdir(parents=True, exist_ok=True)
+                dump = {"truth": t.model_dump(), "block_tx_ids": sorted(block), **values}
+                (debug_dir / f"{t.alert_id}.json").write_text(
+                    json.dumps(dump, indent=2, default=str), encoding="utf-8"
+                )
             print(
                 f"  {t.alert_id} {t.label:8} {expected:>14} -> "
                 f"{case.get('pattern_hypothesis')!s:<14} faithful={ver.get('faithful')}"
@@ -152,6 +178,14 @@ def aggregate(rows: list[dict]) -> dict:
         "mean_evidence_coverage": round(statistics.mean(r["evidence_coverage"] for r in pos), 4)
         if pos
         else None,
+        "mean_seen_coverage": round(statistics.mean(r["seen_coverage"] for r in pos), 4)
+        if pos
+        else None,
+        "mean_evidence_precision": round(
+            statistics.mean(r["evidence_precision"] or 0.0 for r in pos), 4
+        )
+        if pos
+        else None,
         "false_escalations": sum(r["recommended_action"] == "escalate" for r in neg),
         "benign_cases": len(neg),
         "median_wall_ms": med(ok, "wall_ms"),
@@ -167,11 +201,17 @@ def main() -> None:
     parser.add_argument("--set", default="dev", choices=["dev", "eval"])
     parser.add_argument("--provider", default=os.environ.get("LLM_PROVIDER", "ollama"))
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--only", default=None, help="comma-separated alert ids")
+    parser.add_argument(
+        "--debug", action="store_true", help="save each case's full state (gitignored)"
+    )
     args = parser.parse_args()
     if args.set == "eval" and not freeze_tag_exists():
         raise SystemExit(f"refusing the eval set: tag {FREEZE_TAG!r} does not exist yet")
     os.environ["LLM_PROVIDER"] = args.provider
-    rows = asyncio.run(run_set(args.set, args.limit))
+    only = args.only.split(",") if args.only else None
+    debug_dir = ROOT / "evals" / "runs" / args.set / "debug" if args.debug else None
+    rows = asyncio.run(run_set(args.set, args.limit, only, debug_dir))
     headline = [r for r in rows if not r["late_block"]]
     late = [r for r in rows if r["late_block"]]
     provider = get_provider()
