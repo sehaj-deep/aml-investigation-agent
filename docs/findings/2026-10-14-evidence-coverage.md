@@ -80,3 +80,29 @@ p4 spread across repeats: pattern accuracy 1.00, 0.50, 0.33 (mean 0.61, sd 0.28)
 - The model made no tool calls: the case file was enough for it, which also halved the tokens per case.
 
 **Remaining failure mode.** The model often treats the seed's ordinary counterparties as the pattern or names only part of a hub's group. dev-0003: the pattern runs through hub A13 and its contacts A87 to A93, all in the case file, but the model named the seed's own contacts A1 to A12. dev-0005 and dev-0006: the model found the hub A4 but named only one or two of its 12 to 26 members. Identifying which group of accounts forms the pattern is the job of the planned deterministic pattern identification (roadmap phase C).
+
+## Full dev set: code pattern candidates plus the LLM (prompt p5, commit 0c871df)
+
+All 48 dev alerts once on `gpt-oss:20b-cloud`; 728,824 tokens (15,183 per case); no tool calls by the model (the case file was enough for it).
+
+| Real laundering alerts (24) | Code alone (top candidate) | Code plus LLM |
+|---|---|---|
+| Typology correct | 54% | 50% |
+| Evidence coverage | 53% | 63% |
+| Evidence precision | 53% | 53% |
+
+By typology (correct of 3, code / LLM): fan-in 3 / 2, fan-out 3 / 2, gather-scatter 2 / 3, scatter-gather 3 / 3, cycle 2 / 2, random 0 / 0, bipartite 0 / 0, stack 0 / 0.
+
+| Recommendation | Real laundering (24) | Benign (24) |
+|---|---|---|
+| Escalate | 15 (63%) | 7 (29%, false escalations) |
+| Needs more information | 4 | 9 |
+| Close | 5 (21%, missed laundering) | 8 |
+
+Code alone proposes a typology for 15 of 24 benign alerts; the LLM called 5 of 24 benign alerts "none". The LLM adopted a code candidate by id in 1 of 24 positive cases.
+
+## Conclusion
+
+- On naming the typology, the LLM adds nothing over code's top candidate on this set; it adds about 10 points of evidence coverage.
+- The weakest link is the suspicion judgment: the model escalates 63% of real cases but also 29% of benign ones, and closes 21% of real ones. The case file shows network shape and amounts, and the benign controls were chosen to look alike in activity, so shape alone does not separate them.
+- Next: give the case file behavioral risk signals from rules-based detection (roadmap phase B: speed of pass-through, share of funds forwarded, velocity, amount patterns), then compare a stronger model on the same 48 alerts, so the model comparison is not confounded by missing information.
