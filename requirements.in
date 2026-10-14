@@ -12,3 +12,6 @@ uvicorn
 httpx
 psycopg[binary]
 psycopg-pool
+# Sprint 2: tracing
+opentelemetry-api
+opentelemetry-sdk

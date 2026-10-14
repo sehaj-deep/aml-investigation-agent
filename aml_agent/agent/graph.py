@@ -1,18 +1,21 @@
 """The investigation workflow (FR-3).
 
-    triage -> agent <-> tools -> hypothesize -> draft -> human_review -> finalize
-                ^                                            |
-                +------------- request_more -----------------+
+    triage -> agent <-> tools -> hypothesize -> draft -> verify -> human_review -> finalize
+                ^                                                      |
+                +------------------- request_more ---------------------+
 
 - triage (code): fetches the seed's account summary through MCP.
 - agent / tools: the LLM tool loop. Hard limits on steps, tool calls and tokens.
 - hypothesize, draft (LLM): JSON replies validated with Pydantic, one retry each.
   The model names tx_ids; code fetches the evidence rows through MCP, so the model
   never writes amounts, parties or times (FR-3: no lookups the code can do).
+- verify (code): checks every cited tx_id and evidence row against the data
+  (FR-7); failures become visible warnings before review.
 - human_review: LangGraph interrupt. Resumes only with a validated Decision.
 - finalize: refuses to run without an approve or reject decision.
 State is checkpointed after every node (thread_id = case_id), so a paused case
-survives a restart.
+survives a restart. Every node, model call and tool call is written to the audit
+log and traced (aml_agent/instrument.py).
 """
 
 from __future__ import annotations
@@ -27,6 +30,12 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, ValidationError
 
 from aml_agent.agent import prompts
+from aml_agent.instrument import (
+    InstrumentedClient,
+    InstrumentedProvider,
+    NullAudit,
+    audited_node,
+)
 from aml_agent.llm.base import ChatProvider
 from aml_agent.schemas.case import Case, Decision, DraftReply, Evidence, HypothesisReply
 from aml_agent.tools.client import GraphClient
@@ -70,6 +79,7 @@ class CaseState(TypedDict, total=False):
     hypothesis: dict | None
     cited_tx_ids: list[int]
     case: dict | None
+    verification: dict | None
     warnings: list[str]
     decisions: list[dict]
     review_round: int
@@ -106,8 +116,17 @@ def _strip_em_dash(text: str, warnings: list[str], field: str) -> str:
     return text
 
 
-def build_graph(provider: ChatProvider, client: GraphClient, budget: Budget | None = None):
+def build_graph(
+    provider: ChatProvider,
+    client: GraphClient,
+    budget: Budget | None = None,
+    audit=None,
+    verifier=None,
+):
     budget = budget or Budget()
+    audit = audit or NullAudit()
+    provider = InstrumentedProvider(provider, audit)
+    client = InstrumentedClient(client, audit)
 
     async def triage(state: CaseState) -> CaseState:
         alert = state["alert"]
@@ -378,9 +397,26 @@ def build_graph(provider: ChatProvider, client: GraphClient, budget: Budget | No
             "status": "pending_review",
         }
 
+    async def verify(state: CaseState) -> CaseState:
+        warnings = list(state["warnings"])
+        if verifier is None:
+            warnings.append("NOT_VERIFIED: no citation verifier configured")
+            return {"verification": None, "warnings": warnings}
+        result = verifier.verify_case(
+            state["case"],
+            cited_tx_ids=state.get("cited_tx_ids", []),
+            seen_tx_ids=state["seen_tx_ids"],
+        )
+        return {"verification": result.as_dict(), "warnings": [*warnings, *result.warnings()]}
+
     async def human_review(state: CaseState) -> CaseState:
         raw = interrupt(
-            {"case_id": state["case_id"], "case": state["case"], "warnings": state["warnings"]}
+            {
+                "case_id": state["case_id"],
+                "case": state["case"],
+                "verification": state.get("verification"),
+                "warnings": state["warnings"],
+            }
         )
         decision = Decision.model_validate(raw)
         decisions = [*state["decisions"], decision.model_dump(mode="json")]
@@ -420,19 +456,25 @@ def build_graph(provider: ChatProvider, client: GraphClient, budget: Budget | No
         return {"status": "approved" if last["action"] == "approve" else "rejected"}
 
     g = StateGraph(CaseState)
-    g.add_node("triage", triage)
-    g.add_node("agent", agent)
-    g.add_node("tools", tools)
-    g.add_node("hypothesize", hypothesize)
-    g.add_node("draft", draft)
-    g.add_node("human_review", human_review)
-    g.add_node("finalize", finalize)
+    nodes = {
+        "triage": triage,
+        "agent": agent,
+        "tools": tools,
+        "hypothesize": hypothesize,
+        "draft": draft,
+        "verify": verify,
+        "human_review": human_review,
+        "finalize": finalize,
+    }
+    for name, fn in nodes.items():
+        g.add_node(name, audited_node(name, fn, audit))
     g.add_edge(START, "triage")
     g.add_edge("triage", "agent")
     g.add_conditional_edges("agent", after_agent, ["tools", "hypothesize"])
     g.add_conditional_edges("tools", after_tools, ["agent", "hypothesize"])
     g.add_edge("hypothesize", "draft")
-    g.add_edge("draft", "human_review")
+    g.add_edge("draft", "verify")
+    g.add_edge("verify", "human_review")
     g.add_conditional_edges(
         "human_review",
         lambda s: s["next_after_review"],
@@ -442,6 +484,6 @@ def build_graph(provider: ChatProvider, client: GraphClient, budget: Budget | No
     return g, finalize
 
 
-def compile_graph(provider, client, checkpointer, budget: Budget | None = None):
-    g, _ = build_graph(provider, client, budget)
+def compile_graph(provider, client, checkpointer, budget=None, audit=None, verifier=None):
+    g, _ = build_graph(provider, client, budget, audit, verifier)
     return g.compile(checkpointer=checkpointer)

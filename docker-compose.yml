@@ -76,6 +76,11 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-scripted}
       LLM_MODEL: ${LLM_MODEL:-gpt-oss:20b-cloud}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # The citation verifier reads the Parquet source of truth directly (code, not
+      # the model). The model's only data route is still the MCP tools.
+      PARQUET_DIR: /data/parquet
+    volumes:
+      - ./data/parquet:/data/parquet:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

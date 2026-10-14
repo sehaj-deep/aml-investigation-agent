@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS cases (
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS cases_status_idx ON cases (status, updated_at);
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS verification JSONB;
 CREATE TABLE IF NOT EXISTS decisions (
     decision_id BIGSERIAL PRIMARY KEY,
     case_id     TEXT NOT NULL REFERENCES cases (case_id),
@@ -197,6 +198,7 @@ async def save_progress(
         await conn.execute(
             """
             UPDATE cases SET status = %s, draft = %s, warnings = %s, metrics = %s,
+                   verification = %s,
                    provider = %s, model = %s, prompt_version = %s,
                    claimed_by = NULL, claimed_at = NULL, error = NULL, updated_at = now()
             WHERE case_id = %s
@@ -206,6 +208,7 @@ async def save_progress(
                 Jsonb(values.get("case")),
                 Jsonb(values.get("warnings", [])),
                 Jsonb(metrics),
+                Jsonb(values.get("verification")),
                 values.get("provider"),
                 values.get("model"),
                 values.get("prompt_version"),

@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from aml_agent import store
 from aml_agent.alerts.io import read_alerts
 from aml_agent.alerts.models import Alert
+from aml_agent.audit import PostgresAudit, timeline, verify_chain
 from aml_agent.schemas.case import Decision
 
 
@@ -41,6 +42,8 @@ def create_app(pool=None) -> FastAPI:
         await p.open()
         await store.init_schema(p)
         app.state.pool = p
+        app.state.audit = PostgresAudit(p)
+        await app.state.audit.init_schema()
         yield
         await p.close()
 
@@ -61,7 +64,9 @@ def create_app(pool=None) -> FastAPI:
             if not matches:
                 raise HTTPException(404, f"alert {body.alert_id} not in {body.alert_set}")
             alert = matches[0]
-        case_id = await store.create_case(app.state.pool, alert.model_dump(mode="json"))
+        payload = alert.model_dump(mode="json")
+        case_id = await store.create_case(app.state.pool, payload)
+        await app.state.audit.emit(case_id, "case_created", {"alert": payload}, actor="api")
         return {"case_id": case_id, "status": "queued"}
 
     @app.get("/cases")
@@ -83,7 +88,24 @@ def create_app(pool=None) -> FastAPI:
             raise HTTPException(404, "no such case") from None
         except store.CaseStateError as exc:
             raise HTTPException(409, str(exc)) from None
+        await app.state.audit.emit(
+            case_id, "decision_recorded", decision.model_dump(mode="json"), actor="api"
+        )
         return {"case_id": case_id, "status": "decision_recorded"}
+
+    @app.get("/cases/{case_id}/audit")
+    async def audit_events(case_id: str) -> dict:
+        events = await app.state.audit.events(case_id)
+        if not events:
+            raise HTTPException(404, "no audit events for this case")
+        return {"case_id": case_id, "chain_valid": verify_chain(events), "events": events}
+
+    @app.get("/cases/{case_id}/timeline")
+    async def case_timeline(case_id: str) -> dict:
+        events = await app.state.audit.events(case_id)
+        if not events:
+            raise HTTPException(404, "no audit events for this case")
+        return {"case_id": case_id, "chain_valid": verify_chain(events), "lines": timeline(events)}
 
     return app
 
