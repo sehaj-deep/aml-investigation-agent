@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS cases (
 );
 CREATE INDEX IF NOT EXISTS cases_status_idx ON cases (status, updated_at);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS verification JSONB;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS case_graph JSONB;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS analysis JSONB;
 CREATE TABLE IF NOT EXISTS decisions (
     decision_id BIGSERIAL PRIMARY KEY,
     case_id     TEXT NOT NULL REFERENCES cases (case_id),
@@ -115,7 +117,16 @@ async def get_case(pool: AsyncConnectionPool, case_id: str) -> dict | None:
 
 
 async def list_cases(pool: AsyncConnectionPool, status: str | None = None) -> list[dict]:
-    sql = "SELECT case_id, alert_id, status, model, created_at, updated_at FROM cases"
+    sql = """
+        SELECT case_id, alert_id, status, model, prompt_version, created_at, updated_at,
+               alert->>'seed_bank' AS seed_bank, alert->>'seed_account' AS seed_account,
+               draft->>'pattern_hypothesis' AS pattern,
+               draft->>'recommended_action' AS recommended_action,
+               draft->>'confidence' AS confidence,
+               (verification->>'faithful')::boolean AS faithful,
+               jsonb_array_length(warnings) AS n_warnings,
+               jsonb_array_length(COALESCE(draft->'evidence', '[]'::jsonb)) AS n_evidence
+        FROM cases"""
     params: list = []
     if status:
         sql += " WHERE status = %s"
@@ -198,7 +209,7 @@ async def save_progress(
         await conn.execute(
             """
             UPDATE cases SET status = %s, draft = %s, warnings = %s, metrics = %s,
-                   verification = %s,
+                   verification = %s, case_graph = %s, analysis = %s,
                    provider = %s, model = %s, prompt_version = %s,
                    claimed_by = NULL, claimed_at = NULL, error = NULL, updated_at = now()
             WHERE case_id = %s
@@ -209,12 +220,56 @@ async def save_progress(
                 Jsonb(values.get("warnings", [])),
                 Jsonb(metrics),
                 Jsonb(values.get("verification")),
+                Jsonb(values.get("case_graph")),
+                Jsonb(
+                    {
+                        "hypothesis": values.get("hypothesis"),
+                        "candidates": values.get("candidates", []),
+                        "aliases": values.get("aliases", {}),
+                    }
+                ),
                 values.get("provider"),
                 values.get("model"),
                 values.get("prompt_version"),
                 case_id,
             ],
         )
+
+
+async def stats(pool: AsyncConnectionPool) -> dict:
+    """Counts for the operations dashboard."""
+    async with pool.connection() as conn:
+        by_status = await (
+            await conn.execute("SELECT status, count(*) AS n FROM cases GROUP BY status")
+        ).fetchall()
+        by_action = await (
+            await conn.execute(
+                "SELECT draft->>'recommended_action' AS action, count(*) AS n FROM cases "
+                "WHERE draft IS NOT NULL GROUP BY 1"
+            )
+        ).fetchall()
+        by_pattern = await (
+            await conn.execute(
+                "SELECT draft->>'pattern_hypothesis' AS pattern, count(*) AS n FROM cases "
+                "WHERE draft IS NOT NULL GROUP BY 1"
+            )
+        ).fetchall()
+        decisions = await (
+            await conn.execute("SELECT action, count(*) AS n FROM decisions GROUP BY action")
+        ).fetchall()
+        verified = await (
+            await conn.execute(
+                "SELECT count(*) FILTER (WHERE (verification->>'faithful')::boolean) AS faithful, "
+                "count(verification) AS checked FROM cases"
+            )
+        ).fetchone()
+    return {
+        "by_status": {r["status"]: r["n"] for r in by_status},
+        "by_recommended_action": {r["action"]: r["n"] for r in by_action},
+        "by_pattern": {r["pattern"]: r["n"] for r in by_pattern},
+        "decisions": {r["action"]: r["n"] for r in decisions},
+        "verification": verified,
+    }
 
 
 async def mark_failed(pool: AsyncConnectionPool, case_id: str, error: str) -> None:

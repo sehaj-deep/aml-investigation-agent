@@ -36,3 +36,7 @@ evals/runs/**/scripted-*.json
 evals/runs/**/bakeoff-scripted-*.json
 # Debug dumps hold tool outputs (transaction rows): never commit
 evals/runs/**/debug/
+
+# UI build output and dependencies
+ui/node_modules/
+ui/dist/

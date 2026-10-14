@@ -92,6 +92,17 @@ services:
     mem_limit: 512m
     restart: unless-stopped
 
+  # Case-management UI (React), served by nginx; /api is proxied to the api service.
+  ui:
+    build: ./ui
+    ports:
+      - "127.0.0.1:${UI_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 128m
+    restart: unless-stopped
+
   # Tool-query latency benchmark over the real Parquet files (Sprint 0 Verify).
   bench:
     profiles: ["bench"]

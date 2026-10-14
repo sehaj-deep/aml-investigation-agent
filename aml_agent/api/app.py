@@ -69,9 +69,22 @@ def create_app(pool=None) -> FastAPI:
         await app.state.audit.emit(case_id, "case_created", {"alert": payload}, actor="api")
         return {"case_id": case_id, "status": "queued"}
 
+    @app.get("/alerts")
+    async def list_alerts(alert_set: Literal["dev", "eval"] = "dev") -> list[dict]:
+        """Alert inputs only (seed and window); labels are never served."""
+        opened = {c["alert_id"]: c["case_id"] for c in await store.list_cases(app.state.pool)}
+        return [
+            {**a.model_dump(mode="json"), "case_id": opened.get(a.alert_id)}
+            for a in read_alerts(alert_set)
+        ]
+
     @app.get("/cases")
     async def list_cases(status: str | None = None) -> list[dict]:
         return await store.list_cases(app.state.pool, status)
+
+    @app.get("/stats")
+    async def stats() -> dict:
+        return await store.stats(app.state.pool)
 
     @app.get("/cases/{case_id}")
     async def get_case(case_id: str) -> dict:

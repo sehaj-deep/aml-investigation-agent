@@ -1,0 +1,35 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f3f5f8;
+}
+
+.mono {
+  font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.page {
+  padding: 16px;
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #51627a;
+}
+
+.network {
+  width: 100%;
+  height: 460px;
+  background: #fbfcfe;
+  border: 1px solid #e3e8ef;
+  border-radius: 3px;
+}

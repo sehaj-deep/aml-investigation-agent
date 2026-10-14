@@ -122,3 +122,19 @@ def test_api_rules(stack):
     both = {"alert_id": "dev-0001", "alert": {"alert_id": "x"}}
     assert httpx.post(f"{api}/cases", json=both).status_code == 422
     assert httpx.get(f"{api}/cases/nope").status_code == 404
+
+
+def test_alert_list_serves_no_labels_and_stats_work(stack):
+    api = stack["api"]
+    alerts = httpx.get(f"{api}/alerts").json()
+    assert len(alerts) == 48
+    assert set(alerts[0]) == {
+        "alert_id",
+        "seed_bank",
+        "seed_account",
+        "window_start",
+        "window_end",
+        "case_id",
+    }
+    stats = httpx.get(f"{api}/stats").json()
+    assert set(stats) >= {"by_status", "by_recommended_action", "decisions", "verification"}
