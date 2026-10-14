@@ -1,0 +1,487 @@
+{
+  "created_utc": "20261014T205150Z",
+  "excluded_eval_accounts": 561,
+  "account_level": [
+    {
+      "period": "2022-09-04 to 09-06",
+      "accounts": 243776,
+      "positive_accounts": 1749,
+      "base_rate": 0.00717,
+      "pattern_positive_accounts": 775,
+      "average_precision_case_score": 0.069,
+      "average_precision_subject_score": 0.0367,
+      "thresholds": [
+        {
+          "recall_pattern_laundering": 0.9987,
+          "threshold": 1,
+          "alerts": 149661,
+          "true_cases": 1660,
+          "recall": 0.9491,
+          "precision": 0.0111,
+          "alerts_per_true_case": 90.2,
+          "alert_rate": 0.61393
+        },
+        {
+          "recall_pattern_laundering": 0.9923,
+          "threshold": 2,
+          "alerts": 134252,
+          "true_cases": 1602,
+          "recall": 0.916,
+          "precision": 0.0119,
+          "alerts_per_true_case": 83.8,
+          "alert_rate": 0.55072
+        },
+        {
+          "recall_pattern_laundering": 0.9097,
+          "threshold": 3,
+          "alerts": 73412,
+          "true_cases": 1386,
+          "recall": 0.7925,
+          "precision": 0.0189,
+          "alerts_per_true_case": 53.0,
+          "alert_rate": 0.30115
+        },
+        {
+          "recall_pattern_laundering": 0.8116,
+          "threshold": 4,
+          "alerts": 45721,
+          "true_cases": 1121,
+          "recall": 0.6409,
+          "precision": 0.0245,
+          "alerts_per_true_case": 40.8,
+          "alert_rate": 0.18755
+        },
+        {
+          "recall_pattern_laundering": 0.5394,
+          "threshold": 5,
+          "alerts": 24341,
+          "true_cases": 718,
+          "recall": 0.4105,
+          "precision": 0.0295,
+          "alerts_per_true_case": 33.9,
+          "alert_rate": 0.09985
+        },
+        {
+          "recall_pattern_laundering": 0.3432,
+          "threshold": 6,
+          "alerts": 10158,
+          "true_cases": 428,
+          "recall": 0.2447,
+          "precision": 0.0421,
+          "alerts_per_true_case": 23.7,
+          "alert_rate": 0.04167
+        },
+        {
+          "recall_pattern_laundering": 0.2284,
+          "threshold": 7,
+          "alerts": 2137,
+          "true_cases": 224,
+          "recall": 0.1281,
+          "precision": 0.1048,
+          "alerts_per_true_case": 9.5,
+          "alert_rate": 0.00877
+        },
+        {
+          "recall_pattern_laundering": 0.151,
+          "threshold": 8,
+          "alerts": 750,
+          "true_cases": 134,
+          "recall": 0.0766,
+          "precision": 0.1787,
+          "alerts_per_true_case": 5.6,
+          "alert_rate": 0.00308
+        },
+        {
+          "recall_pattern_laundering": 0.1071,
+          "threshold": 9,
+          "alerts": 164,
+          "true_cases": 86,
+          "recall": 0.0492,
+          "precision": 0.5244,
+          "alerts_per_true_case": 1.9,
+          "alert_rate": 0.00067
+        },
+        {
+          "recall_pattern_laundering": 0.0658,
+          "threshold": 10,
+          "alerts": 55,
+          "true_cases": 51,
+          "recall": 0.0292,
+          "precision": 0.9273,
+          "alerts_per_true_case": 1.1,
+          "alert_rate": 0.00023
+        },
+        {
+          "recall_pattern_laundering": 0.031,
+          "threshold": 11,
+          "alerts": 24,
+          "true_cases": 24,
+          "recall": 0.0137,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 0.0001
+        },
+        {
+          "recall_pattern_laundering": 0.0194,
+          "threshold": 12,
+          "alerts": 15,
+          "true_cases": 15,
+          "recall": 0.0086,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 6e-05
+        },
+        {
+          "recall_pattern_laundering": 0.0155,
+          "threshold": 14,
+          "alerts": 12,
+          "true_cases": 12,
+          "recall": 0.0069,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 5e-05
+        },
+        {
+          "recall_pattern_laundering": 0.0077,
+          "threshold": 15,
+          "alerts": 6,
+          "true_cases": 6,
+          "recall": 0.0034,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 2e-05
+        },
+        {
+          "recall_pattern_laundering": 0.0065,
+          "threshold": 16,
+          "alerts": 5,
+          "true_cases": 5,
+          "recall": 0.0029,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 2e-05
+        }
+      ]
+    },
+    {
+      "period": "2022-09-07 to 09-09",
+      "accounts": 360360,
+      "positive_accounts": 1964,
+      "base_rate": 0.00545,
+      "pattern_positive_accounts": 992,
+      "average_precision_case_score": 0.0759,
+      "average_precision_subject_score": 0.0399,
+      "thresholds": [
+        {
+          "recall_pattern_laundering": 0.996,
+          "threshold": 1,
+          "alerts": 279734,
+          "true_cases": 1886,
+          "recall": 0.9603,
+          "precision": 0.0067,
+          "alerts_per_true_case": 148.3,
+          "alert_rate": 0.77626
+        },
+        {
+          "recall_pattern_laundering": 0.9899,
+          "threshold": 2,
+          "alerts": 243995,
+          "true_cases": 1809,
+          "recall": 0.9211,
+          "precision": 0.0074,
+          "alerts_per_true_case": 134.9,
+          "alert_rate": 0.67709
+        },
+        {
+          "recall_pattern_laundering": 0.9395,
+          "threshold": 3,
+          "alerts": 99380,
+          "true_cases": 1580,
+          "recall": 0.8045,
+          "precision": 0.0159,
+          "alerts_per_true_case": 62.9,
+          "alert_rate": 0.27578
+        },
+        {
+          "recall_pattern_laundering": 0.8639,
+          "threshold": 4,
+          "alerts": 50351,
+          "true_cases": 1321,
+          "recall": 0.6726,
+          "precision": 0.0262,
+          "alerts_per_true_case": 38.1,
+          "alert_rate": 0.13972
+        },
+        {
+          "recall_pattern_laundering": 0.5958,
+          "threshold": 5,
+          "alerts": 23911,
+          "true_cases": 854,
+          "recall": 0.4348,
+          "precision": 0.0357,
+          "alerts_per_true_case": 28.0,
+          "alert_rate": 0.06635
+        },
+        {
+          "recall_pattern_laundering": 0.3871,
+          "threshold": 6,
+          "alerts": 11207,
+          "true_cases": 526,
+          "recall": 0.2678,
+          "precision": 0.0469,
+          "alerts_per_true_case": 21.3,
+          "alert_rate": 0.0311
+        },
+        {
+          "recall_pattern_laundering": 0.244,
+          "threshold": 7,
+          "alerts": 2314,
+          "true_cases": 284,
+          "recall": 0.1446,
+          "precision": 0.1227,
+          "alerts_per_true_case": 8.1,
+          "alert_rate": 0.00642
+        },
+        {
+          "recall_pattern_laundering": 0.1482,
+          "threshold": 8,
+          "alerts": 854,
+          "true_cases": 163,
+          "recall": 0.083,
+          "precision": 0.1909,
+          "alerts_per_true_case": 5.2,
+          "alert_rate": 0.00237
+        },
+        {
+          "recall_pattern_laundering": 0.1038,
+          "threshold": 9,
+          "alerts": 179,
+          "true_cases": 105,
+          "recall": 0.0535,
+          "precision": 0.5866,
+          "alerts_per_true_case": 1.7,
+          "alert_rate": 0.0005
+        },
+        {
+          "recall_pattern_laundering": 0.0544,
+          "threshold": 10,
+          "alerts": 61,
+          "true_cases": 54,
+          "recall": 0.0275,
+          "precision": 0.8852,
+          "alerts_per_true_case": 1.1,
+          "alert_rate": 0.00017
+        },
+        {
+          "recall_pattern_laundering": 0.0323,
+          "threshold": 11,
+          "alerts": 32,
+          "true_cases": 32,
+          "recall": 0.0163,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 9e-05
+        },
+        {
+          "recall_pattern_laundering": 0.0242,
+          "threshold": 12,
+          "alerts": 24,
+          "true_cases": 24,
+          "recall": 0.0122,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 7e-05
+        },
+        {
+          "recall_pattern_laundering": 0.0091,
+          "threshold": 14,
+          "alerts": 9,
+          "true_cases": 9,
+          "recall": 0.0046,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 2e-05
+        },
+        {
+          "recall_pattern_laundering": 0.0081,
+          "threshold": 15,
+          "alerts": 8,
+          "true_cases": 8,
+          "recall": 0.0041,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 2e-05
+        },
+        {
+          "recall_pattern_laundering": 0.003,
+          "threshold": 16,
+          "alerts": 3,
+          "true_cases": 3,
+          "recall": 0.0015,
+          "precision": 1.0,
+          "alerts_per_true_case": 1.0,
+          "alert_rate": 1e-05
+        }
+      ]
+    }
+  ],
+  "transaction_level": {
+    "period": "test period 09-08 16:12 to 09-10",
+    "transactions": 989187,
+    "laundering_transactions": 1074,
+    "base_rate": 0.001086,
+    "average_precision": 0.0363,
+    "best_f1": {
+      "threshold": 10,
+      "alerts": 239,
+      "true_cases": 74,
+      "recall": 0.0689,
+      "precision": 0.3096,
+      "alerts_per_true_case": 3.2,
+      "alert_rate": 0.00024,
+      "f1": 0.1127
+    },
+    "thresholds": [
+      {
+        "threshold": 1,
+        "alerts": 971824,
+        "true_cases": 1071,
+        "recall": 0.9972,
+        "precision": 0.0011,
+        "alerts_per_true_case": 907.4,
+        "alert_rate": 0.98245,
+        "f1": 0.0022
+      },
+      {
+        "threshold": 2,
+        "alerts": 943180,
+        "true_cases": 1067,
+        "recall": 0.9935,
+        "precision": 0.0011,
+        "alerts_per_true_case": 884.0,
+        "alert_rate": 0.95349,
+        "f1": 0.0022
+      },
+      {
+        "threshold": 3,
+        "alerts": 779466,
+        "true_cases": 1038,
+        "recall": 0.9665,
+        "precision": 0.0013,
+        "alerts_per_true_case": 750.9,
+        "alert_rate": 0.78799,
+        "f1": 0.0026
+      },
+      {
+        "threshold": 4,
+        "alerts": 597353,
+        "true_cases": 976,
+        "recall": 0.9088,
+        "precision": 0.0016,
+        "alerts_per_true_case": 612.0,
+        "alert_rate": 0.60388,
+        "f1": 0.0032
+      },
+      {
+        "threshold": 5,
+        "alerts": 271547,
+        "true_cases": 760,
+        "recall": 0.7076,
+        "precision": 0.0028,
+        "alerts_per_true_case": 357.3,
+        "alert_rate": 0.27452,
+        "f1": 0.0056
+      },
+      {
+        "threshold": 6,
+        "alerts": 56478,
+        "true_cases": 494,
+        "recall": 0.46,
+        "precision": 0.0087,
+        "alerts_per_true_case": 114.3,
+        "alert_rate": 0.0571,
+        "f1": 0.0171
+      },
+      {
+        "threshold": 7,
+        "alerts": 12817,
+        "true_cases": 259,
+        "recall": 0.2412,
+        "precision": 0.0202,
+        "alerts_per_true_case": 49.5,
+        "alert_rate": 0.01296,
+        "f1": 0.0373
+      },
+      {
+        "threshold": 8,
+        "alerts": 5813,
+        "true_cases": 185,
+        "recall": 0.1723,
+        "precision": 0.0318,
+        "alerts_per_true_case": 31.4,
+        "alert_rate": 0.00588,
+        "f1": 0.0537
+      },
+      {
+        "threshold": 9,
+        "alerts": 1322,
+        "true_cases": 116,
+        "recall": 0.108,
+        "precision": 0.0877,
+        "alerts_per_true_case": 11.4,
+        "alert_rate": 0.00134,
+        "f1": 0.0968
+      },
+      {
+        "threshold": 10,
+        "alerts": 239,
+        "true_cases": 74,
+        "recall": 0.0689,
+        "precision": 0.3096,
+        "alerts_per_true_case": 3.2,
+        "alert_rate": 0.00024,
+        "f1": 0.1127
+      },
+      {
+        "threshold": 11,
+        "alerts": 126,
+        "true_cases": 40,
+        "recall": 0.0372,
+        "precision": 0.3175,
+        "alerts_per_true_case": 3.1,
+        "alert_rate": 0.00013,
+        "f1": 0.0666
+      },
+      {
+        "threshold": 12,
+        "alerts": 80,
+        "true_cases": 32,
+        "recall": 0.0298,
+        "precision": 0.4,
+        "alerts_per_true_case": 2.5,
+        "alert_rate": 8e-05,
+        "f1": 0.0555
+      },
+      {
+        "threshold": 14,
+        "alerts": 14,
+        "true_cases": 9,
+        "recall": 0.0084,
+        "precision": 0.6429,
+        "alerts_per_true_case": 1.6,
+        "alert_rate": 1e-05,
+        "f1": 0.0166
+      },
+      {
+        "threshold": 15,
+        "alerts": 4,
+        "true_cases": 3,
+        "recall": 0.0028,
+        "precision": 0.75,
+        "alerts_per_true_case": 1.3,
+        "alert_rate": 0.0,
+        "f1": 0.0056
+      }
+    ]
+  }
+}

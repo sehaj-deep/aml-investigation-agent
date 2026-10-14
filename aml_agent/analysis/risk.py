@@ -24,6 +24,14 @@ from dataclasses import dataclass
 HIGH_BAND = 7
 MEDIUM_BAND = 5
 
+# Signal thresholds, shared with the set-based population scorer (population.py).
+NEW_COUNTERPARTY_MIN = 0.9
+ONE_TIME_COUNTERPARTY_MIN = 0.7
+PERIOD_ACTIVITY_MIN = 0.7
+ONWARD_24H_MIN = 0.5
+ONE_TIME_MAX_TRANSFERS = 2
+MAX_RISK_COUNTERPARTIES = 8
+
 
 @dataclass(frozen=True)
 class Rule:
@@ -83,13 +91,13 @@ def fired_rules(signals: dict) -> list[str]:
         fired.append("R1")
     if signals["receives_and_pays"]:
         fired.append("R2")
-    if signals["new_counterparty_share"] >= 0.9:
+    if signals["new_counterparty_share"] >= NEW_COUNTERPARTY_MIN:
         fired.append("R3")
-    if signals["one_time_counterparty_share"] >= 0.7:
+    if signals["one_time_counterparty_share"] >= ONE_TIME_COUNTERPARTY_MIN:
         fired.append("R4")
-    if signals["period_activity_share"] >= 0.7:
+    if signals["period_activity_share"] >= PERIOD_ACTIVITY_MIN:
         fired.append("R5")
-    if signals["onward_within_24h_share"] >= 0.5:
+    if signals["onward_within_24h_share"] >= ONWARD_24H_MIN:
         fired.append("R6")
     return fired
 

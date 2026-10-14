@@ -39,7 +39,6 @@ MAX_EXPANSIONS = 25
 ROUND_TRIP_HOPS = 8
 MAX_ROUND_TRIPS = 5
 MAX_TRANSFER_LINES = 300
-MAX_RISK_COUNTERPARTIES = 8  # first-time counterparties checked for risk
 
 ALIAS_RE = re.compile(r"^A(\d+)$")
 DIRECT_RE = re.compile(r"^(\d+)\s*/\s*([0-9A-Z]{1,20})$")
@@ -343,7 +342,7 @@ async def build_case_file(client: GraphClient, alert: dict) -> CaseFile:
     )
     checked: set[Account] = set()
     for _, bank, acct in first_time:
-        if (bank, acct) in checked or len(checked) >= MAX_RISK_COUNTERPARTIES:
+        if (bank, acct) in checked or len(checked) >= risk_rules.MAX_RISK_COUNTERPARTIES:
             continue
         checked.add((bank, acct))
         behavior[b.aliases[(bank, acct)]] = await call(

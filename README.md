@@ -4,7 +4,7 @@ A portfolio project: a LangGraph agent that investigates **synthetic** anti-mone
 
 **This is not a production AML system.** It runs only on synthetic data and free-tier tooling. Strong results here do not show it would work on real bank data.
 
-Status: Sprints 0 to 2 built; no model results yet (no live model has been run). See `docs/PRD.md`, `docs/sprints/` and `docs/verify/`.
+Status: investigation agent, controls, code-built case file, typology indicators, rules-based risk indicators and the case-management UI are built. Measured results, with their caveats, are in [`docs/SCORECARD.md`](docs/SCORECARD.md); the plan is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## What it does
 
