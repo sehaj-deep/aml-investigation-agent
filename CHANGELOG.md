@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased: Sprint 2 (audit and faithfulness), pending owner review and a live model
+- Append-only, hash-chained audit log of every model call, tool call, state change and decision; UPDATE, DELETE and TRUNCATE blocked; a case rebuilt from the log alone matches the live run exactly.
+- OpenTelemetry traces exported to a Postgres `traces` table.
+- Citation verifier on the Parquet source of truth, run before review; failures are visible warnings. Corruption test: 288 of 288 corruptions flagged, no false alarms on 24 clean cases.
+- API: `GET /cases/{id}/audit` and `/timeline`. Evaluation harness `evals/run_evals.py` (dev set only until the freeze tag).
+- Threat model.
+
 ## Unreleased: Sprint 1 (investigation agent), pending owner review and a live model
 - Read-only tool database (no labels) and four bounded graph tools served over MCP: get_account_summary, get_neighbors, trace_funds, get_transactions.
 - LangGraph workflow: triage, tool loop with step, tool-call and token budgets, hypothesize, draft, human-approval interrupt, finalize (refused without a decision). Postgres checkpoints; evidence rows filled by code from tx_ids.

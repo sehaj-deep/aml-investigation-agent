@@ -53,6 +53,8 @@ Activate the venv first (`.venv/Scripts/activate`). `make` is not installed on t
 - Local processes: `python -m aml_agent.tools.mcp_server --http`, `python -m aml_agent.api`, `python -m aml_agent.worker` (on Windows set `MCP_URL`)
 - Bake-off (dev alerts only): `python scripts/bakeoff.py --models <tag1>,<tag2> --n 20`
 - Docker tests: `python -m pytest -m docker` (uses database `aml_test`)
+- Dev-set evaluation: `python evals/run_evals.py --set dev` (the eval set is refused until tag `eval-freeze` exists)
+- Case audit: `GET http://127.0.0.1:8000/cases/<id>/timeline` and `/audit`
 
 ## Definition of done for a sprint
 1. The sprint's **Verify** checks in the PRD have been run and the output shown to me, not only written as tests.

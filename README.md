@@ -4,7 +4,27 @@ A portfolio project: a LangGraph agent that investigates **synthetic** anti-mone
 
 **This is not a production AML system.** It runs only on synthetic data and free-tier tooling. Strong results here do not show it would work on real bank data.
 
-Status: Sprint 0 (foundation). See `docs/PRD.md` and `docs/sprints/`.
+Status: Sprints 0 to 2 built; no model results yet (no live model has been run). See `docs/PRD.md`, `docs/sprints/` and `docs/verify/`.
+
+## What it does
+
+An alert (one seed account and a time window) goes in. A LangGraph agent investigates the transaction graph only through read-only, bounded MCP tools, proposes a pattern, and drafts a case whose evidence rows are fetched by code. A verifier checks every cited transaction against the data, the case pauses for a human decision, and every step is written to an append-only, hash-chained audit log, with traces in Postgres.
+
+Services (`docker compose up -d --wait`): `postgres` (with pgvector), `mcp-graph` (tools), `api` (http://127.0.0.1:8000), `agent-worker`.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /cases` with `{"alert_id": "dev-0001"}` | Queue a case |
+| `GET /cases?status=pending_review` | Cases waiting for review |
+| `GET /cases/{id}` | Draft, evidence, verification, warnings, metrics |
+| `POST /cases/{id}/decision` | `approve`, `reject` or `request_more`, with a reason and reviewer |
+| `GET /cases/{id}/timeline` | What the agent did, read from the audit log |
+
+There is no endpoint that finalizes a case.
+
+## Limitations
+
+Synthetic data only; results would not transfer to real bank data. Alerts are built from the dataset's labels (no monitoring system yet). The tools see every bank's transactions, which no real institution can. The US jurisdiction label is inferred from bank names and currencies. No authentication: local demo only. See `docs/threat_model.md`.
 
 ## Data
 
@@ -18,10 +38,12 @@ License: the dataset is published under the Community Data License Agreement, Sh
 python -m venv .venv
 .venv/Scripts/activate    # Windows; use .venv/bin/activate elsewhere
 make install
-make convert
+make convert       # about 2 minutes; Parquet tables and the read-only tool DB
 make test-data
-make up
+make up            # postgres, mcp-graph, api, agent-worker
 ```
+
+Without a model, the stack runs with `LLM_PROVIDER=scripted` (deterministic, for tests). For real runs, install Ollama, sign in, and set `LLM_PROVIDER=ollama` and `LLM_MODEL` in `.env`.
 
 ## Citation
 
