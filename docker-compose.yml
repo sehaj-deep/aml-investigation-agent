@@ -20,6 +20,72 @@ services:
     mem_limit: 1g
     restart: unless-stopped
 
+  # Read-only graph tools over MCP (streamable HTTP). The only route to the data.
+  mcp-graph:
+    build: .
+    command: ["python", "-m", "aml_agent.tools.mcp_server", "--http"]
+    environment:
+      PARQUET_DIR: /data/parquet
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8001"
+      TOOLS_SHOW_PAYMENT_FORMAT: ${TOOLS_SHOW_PAYMENT_FORMAT:-false}
+    volumes:
+      - ./data/parquet:/data/parquet:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8001), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 2g
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: ["python", "-m", "aml_agent.api"]
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-aml}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-aml}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+
+  agent-worker:
+    build: .
+    command: ["python", "-m", "aml_agent.worker"]
+    environment:
+      MCP_URL: http://mcp-graph:8001/mcp
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-aml}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-aml}
+      LLM_PROVIDER: ${LLM_PROVIDER:-scripted}
+      LLM_MODEL: ${LLM_MODEL:-gpt-oss:20b-cloud}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-graph:
+        condition: service_healthy
+    mem_limit: 512m
+    restart: unless-stopped
+
   # Tool-query latency benchmark over the real Parquet files (Sprint 0 Verify).
   bench:
     profiles: ["bench"]

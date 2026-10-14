@@ -1,9 +1,11 @@
 .git
 .venv
 data
-evals
 tests
 docs
+evals/alerts/ground_truth
+evals/runs
+evals/labels
 **/__pycache__
 .env
 .env.*
