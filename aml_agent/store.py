@@ -125,7 +125,9 @@ async def list_cases(pool: AsyncConnectionPool, status: str | None = None) -> li
                draft->>'confidence' AS confidence,
                (verification->>'faithful')::boolean AS faithful,
                jsonb_array_length(warnings) AS n_warnings,
-               jsonb_array_length(COALESCE(draft->'evidence', '[]'::jsonb)) AS n_evidence
+               jsonb_array_length(COALESCE(draft->'evidence', '[]'::jsonb)) AS n_evidence,
+               (analysis->'risk'->>'score')::int AS risk_score,
+               analysis->'risk'->>'band' AS risk_band
         FROM cases"""
     params: list = []
     if status:
@@ -225,6 +227,7 @@ async def save_progress(
                     {
                         "hypothesis": values.get("hypothesis"),
                         "candidates": values.get("candidates", []),
+                        "risk": values.get("risk"),
                         "aliases": values.get("aliases", {}),
                     }
                 ),

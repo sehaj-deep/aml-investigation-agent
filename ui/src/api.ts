@@ -34,6 +34,8 @@ export interface CaseRow {
   faithful: boolean | null
   n_warnings: number
   n_evidence: number
+  risk_score: number | null
+  risk_band: 'high' | 'medium' | 'low' | null
 }
 
 export interface Evidence {
@@ -109,6 +111,14 @@ export interface Decision {
   applied_at: string | null
 }
 
+export interface CaseRisk {
+  score: number
+  band: 'high' | 'medium' | 'low'
+  subject: { score: number; rules: string[] }
+  top_counterparty: { label: string; score: number; rules: string[] } | null
+  counterparties: Record<string, { score: number; rules: string[] }>
+}
+
 export interface CaseDetail {
   case_id: string
   alert_id: string
@@ -123,6 +133,7 @@ export interface CaseDetail {
     hypothesis: { pattern_hypothesis: string; pattern_accounts: unknown[]; rationale: string } | null
     candidates: Candidate[]
     aliases: Record<string, [number, string]>
+    risk?: CaseRisk | null
   } | null
   error: string | null
   provider: string | null

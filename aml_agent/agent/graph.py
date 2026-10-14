@@ -79,6 +79,7 @@ class CaseState(TypedDict, total=False):
     evidence_rows: list[dict]
     case_graph: dict
     candidates: list[dict]
+    risk: dict
     steps: int
     tool_calls: int
     round_steps: int
@@ -178,6 +179,7 @@ def build_graph(
             "aliases": {k: list(v) for k, v in case_file.aliases.items()},
             "case_graph": case_file.graph,
             "candidates": case_file.candidates,
+            "risk": case_file.risk,
             "evidence_rows": [],
             "steps": 0,
             "tool_calls": 0,

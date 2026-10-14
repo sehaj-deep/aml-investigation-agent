@@ -22,7 +22,9 @@ import json
 # p6: the drafted summary is written for a bank investigator in AML typology language
 #     (funds concentration, pass-through account, round-tripping, layering) instead of
 #     the simulator's pattern names. Pattern keys in the JSON are unchanged.
-PROMPT_VERSION = "p6"
+# p7: the case file adds rules-based risk indicators (R1 to R6, a score and a band);
+#     the model weighs them with the network evidence when recommending an action.
+PROMPT_VERSION = "p7"
 
 SYSTEM = """You are an anti-money-laundering (AML) investigator working on SYNTHETIC data.
 You receive an alert: one seed account and a time window, and a CASE FILE that code has
@@ -63,17 +65,25 @@ The case file:
 - names busy accounts that were not expanded;
 - lists pattern candidates found by code (C1, C2, C3): shapes built from one-off
   relationships. They are leads, not verdicts: ordinary one-off payments can form the
-  same shapes.
+  same shapes;
+- gives rules-based risk indicators: red flags such as currency conversion
+  pass-through, flow-through activity, new or one-time counterparties, activity
+  concentrated in the review period and rapid onward transfers, for the subject and its
+  riskiest first-time counterparty, with a score and a band (high, medium, low).
 
 How to investigate:
 1. Read the case file. Work out who pays whom: arrows point from sender to receiver.
 2. Check the candidates against the transfers. Decide whether any of them is a real
    laundering pattern or ordinary activity, and whether a different reading fits better.
    The seed may be the center of the pattern or one member of it.
-3. Use the tools only for what the case file lacks: an account it did not expand, a
+3. Weigh the risk indicators. Shape alone is weak evidence: ordinary accounts also make
+   one-off payments. A coherent structure together with several red flags supports
+   escalation; a structure with few red flags may be ordinary activity; when the
+   network and the indicators disagree, say so and prefer "needs_more_info".
+4. Use the tools only for what the case file lacks: an account it did not expand, a
    chain that continues past step 2 (trace_funds follows money up to 8 steps), or a
    detail you need. Many cases need no tool call at all.
-4. Then reply without a tool call. Code will ask you for the pattern and its accounts,
+5. Then reply without a tool call. Code will ask you for the pattern and its accounts,
    and will collect the transfers among those accounts as the evidence.
 - Write plain text. Never use the long dash character (Unicode U+2014); use commas,
   colons or parentheses instead.

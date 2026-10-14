@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
+from aml_agent.analysis import risk as risk_rules
 from aml_agent.analysis.patterns import (
     ONE_OFF_MAX_TRANSFERS,
     describe,
@@ -38,6 +39,7 @@ MAX_EXPANSIONS = 25
 ROUND_TRIP_HOPS = 8
 MAX_ROUND_TRIPS = 5
 MAX_TRANSFER_LINES = 300
+MAX_RISK_COUNTERPARTIES = 8  # first-time counterparties checked for risk
 
 ALIAS_RE = re.compile(r"^A(\d+)$")
 DIRECT_RE = re.compile(r"^(\d+)\s*/\s*([0-9A-Z]{1,20})$")
@@ -57,6 +59,8 @@ class CaseFile:
     graph: dict = field(default_factory=dict)
     # Ranked pattern candidates found by code (aml_agent/analysis/patterns.py).
     candidates: list[dict] = field(default_factory=list)
+    # Rules-based risk score and reasons (aml_agent/analysis/risk.py).
+    risk: dict = field(default_factory=dict)
 
 
 def _short(amount: str) -> str:
@@ -327,10 +331,36 @@ async def build_case_file(client: GraphClient, alert: dict) -> CaseFile:
     candidates = find_candidates(graph)
     lines.append("")
     lines.append(describe(candidates))
+
+    # Behavioral risk: the subject and its first-time step-1 counterparties.
+    behavior = {"A0": await call("get_account_behavior", base)}
+    first_time = sorted(
+        (
+            (c["n_tx"], c["bank_id"], c["account"])
+            for c in (step1 or {}).get("counterparties", [])
+            if c["n_tx"] <= ONE_OFF_MAX_TRANSFERS
+        ),
+    )
+    checked: set[Account] = set()
+    for _, bank, acct in first_time:
+        if (bank, acct) in checked or len(checked) >= MAX_RISK_COUNTERPARTIES:
+            continue
+        checked.add((bank, acct))
+        behavior[b.aliases[(bank, acct)]] = await call(
+            "get_account_behavior", {"bank_id": bank, "account": acct, **window}
+        )
+    subject_signals = (behavior["A0"] or {}).get("signals", {})
+    case_risk = risk_rules.case_risk(
+        subject_signals,
+        {k: v["signals"] for k, v in behavior.items() if k != "A0" and v},
+    )
+    lines.append("")
+    lines.append(risk_rules.describe(case_risk))
     return CaseFile(
         text="\n".join(lines),
         graph=graph,
         candidates=[c.as_dict() for c in candidates],
+        risk=case_risk,
         aliases={alias: acc for acc, alias in b.aliases.items()},
         seen_tx_ids=list(dict.fromkeys(b.tx_ids)),
         seen_accounts=list(b.aliases),

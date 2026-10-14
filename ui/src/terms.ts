@@ -48,6 +48,30 @@ export function typologyName(key: string | null | undefined): string {
   return TYPOLOGY[key]?.name ?? key
 }
 
+export const RISK_RULES: Record<string, { title: string; description: string }> = {
+  R1: {
+    title: 'Currency conversion pass-through',
+    description: 'Receives funds in one currency and pays out only in other currencies.',
+  },
+  R2: { title: 'Flow-through activity', description: 'Both receives and pays out funds in the review period.' },
+  R3: {
+    title: 'Predominantly new counterparties',
+    description: 'At least 90% of counterparties in the review period were never seen before it.',
+  },
+  R4: {
+    title: 'Predominantly one-time relationships',
+    description: 'At least 70% of counterparties transact only once or twice in the review period.',
+  },
+  R5: {
+    title: 'Activity concentrated in the review period',
+    description: "At least 70% of the account's transactions fall in the review period.",
+  },
+  R6: {
+    title: 'Rapid onward transfers',
+    description: 'At least half of incoming transfers are followed by an outgoing payment within 24 hours.',
+  },
+}
+
 export const RECOMMENDATION: Record<string, { name: string; color: string }> = {
   escalate: { name: 'Escalate for SAR review', color: 'volcano' },
   close: { name: 'Close: no suspicious activity', color: 'green' },

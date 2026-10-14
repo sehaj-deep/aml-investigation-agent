@@ -43,6 +43,7 @@ def test_no_write_tools_exist():
         "get_neighbors",
         "trace_funds",
         "get_transfers_among",
+        "get_account_behavior",
         "get_transactions",
     }
 

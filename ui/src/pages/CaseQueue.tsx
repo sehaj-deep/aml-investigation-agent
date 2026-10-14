@@ -4,7 +4,7 @@ import { Alert, Card, Input, Select, Space, Table, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { api, type CaseRow, type CaseStatus } from '../api'
-import { ActionTag, PatternTag, StatusTag, VerifiedBadge } from '../components/badges'
+import { ActionTag, PatternTag, RiskBadge, StatusTag, VerifiedBadge } from '../components/badges'
 
 const STATUS_FILTERS: { label: string; value: CaseStatus | 'all' | 'open' }[] = [
   { label: 'All', value: 'all' },
@@ -44,7 +44,11 @@ export default function CaseQueue() {
               .includes(search.toLowerCase())
           : true,
       )
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      // Highest risk first, then newest: queues are worked by priority.
+      .sort(
+        (a, b) =>
+          (b.risk_score ?? -1) - (a.risk_score ?? -1) || b.created_at.localeCompare(a.created_at),
+      )
   }, [data, status, search])
 
   return (
@@ -92,6 +96,12 @@ export default function CaseQueue() {
                   {r.seed_bank}/{r.seed_account}
                 </span>
               ),
+            },
+            {
+              title: 'Risk',
+              dataIndex: 'risk_score',
+              render: (_, r) => <RiskBadge score={r.risk_score} band={r.risk_band} />,
+              sorter: (a, b) => (a.risk_score ?? -1) - (b.risk_score ?? -1),
             },
             { title: 'Status', dataIndex: 'status', render: (v: CaseStatus) => <StatusTag status={v} /> },
             { title: 'Typology (AI)', dataIndex: 'pattern', render: (v) => <PatternTag pattern={v} /> },

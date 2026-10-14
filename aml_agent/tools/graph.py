@@ -16,7 +16,9 @@ Amounts are returned as strings so no precision is lost.
 
 from __future__ import annotations
 
+import bisect
 import os
+import statistics
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -25,6 +27,7 @@ from typing import Any, Literal
 import duckdb
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from aml_agent.analysis.risk import account_score, fired_rules
 from aml_agent.data.tooldb import tool_db_path
 
 MAX_HOPS = 8  # chain patterns (cycle, random) reach up to 8 steps from the seed on dev alerts
@@ -34,6 +37,7 @@ MAX_TX_IDS_PER_COUNTERPARTY = 20
 MAX_TRACE_EDGES = 300
 MAX_FANOUT_PER_NODE = 20
 MAX_TX_IDS = 100
+MAX_BEHAVIOR_TRANSFERS = 5000
 MAX_WINDOW = timedelta(days=31)
 MAX_GROUP_ACCOUNTS = 30
 MAX_GROUP_TRANSFERS = 300
@@ -502,6 +506,102 @@ class GraphTools:
             "unconnected_accounts": [
                 {"bank_id": b, "account": a} for b, a in group if (b, a) not in linked
             ],
+            "capped": capped,
+        }
+
+    def get_account_behavior(self, **kwargs: Any) -> dict[str, Any]:
+        """Behavioral red-flag signals for one account in a review period, with the risk
+        rules they fire (aml_agent/analysis/risk.py). Non-self transfers only."""
+        args = SummaryArgs(**kwargs)
+        capped: dict = {}
+        start, end = self._window(args, capped)
+        key = [args.bank_id, args.account]
+        rows = self.con.execute(
+            f"""
+            SELECT ts, from_bank, from_account, to_bank, to_account, currency_paid,
+                   currency_received
+            FROM transactions
+            WHERE NOT is_self_transfer AND ts BETWEEN ? AND ?
+              AND ((from_bank = ? AND from_account = ?) OR (to_bank = ? AND to_account = ?))
+            ORDER BY ts, tx_id
+            LIMIT {MAX_BEHAVIOR_TRANSFERS + 1}
+            """,
+            [start, end, *key, *key],
+        ).fetchall()
+        if len(rows) > MAX_BEHAVIOR_TRANSFERS:
+            capped["transfers"] = {"applied": MAX_BEHAVIOR_TRANSFERS}
+            rows = rows[:MAX_BEHAVIOR_TRANSFERS]
+        acc = (args.bank_id, args.account)
+        ins = [r for r in rows if (r[3], r[4]) == acc]
+        outs = [r for r in rows if (r[1], r[2]) == acc]
+        out_times = [r[0] for r in outs]
+        onward_hours = []
+        for r in ins:
+            i = bisect.bisect_left(out_times, r[0])
+            if i < len(out_times):
+                onward_hours.append((out_times[i] - r[0]).total_seconds() / 3600)
+        pair_n: dict[tuple, int] = {}
+        for r in rows:
+            other = (r[3], r[4]) if (r[1], r[2]) == acc else (r[1], r[2])
+            pair_n[other] = pair_n.get(other, 0) + 1
+        before = {
+            (b, a)
+            for b, a in self.con.execute(
+                """
+                SELECT DISTINCT
+                    CASE WHEN from_bank = ? AND from_account = ? THEN to_bank ELSE from_bank END,
+                    CASE WHEN from_bank = ? AND from_account = ?
+                         THEN to_account ELSE from_account END
+                FROM transactions
+                WHERE NOT is_self_transfer AND ts >= ? AND ts < ?
+                  AND ((from_bank = ? AND from_account = ?) OR (to_bank = ? AND to_account = ?))
+                """,
+                [*key, *key, DATA_START, start, *key, *key],
+            ).fetchall()
+        }
+        (total,) = self.con.execute(
+            """
+            SELECT count(*) FROM transactions
+            WHERE NOT is_self_transfer AND ts BETWEEN ? AND ?
+              AND ((from_bank = ? AND from_account = ?) OR (to_bank = ? AND to_account = ?))
+            """,
+            [DATA_START, data_end(), *key, *key],
+        ).fetchone()
+        in_ccy = sorted({r[6] for r in ins})
+        out_ccy = sorted({r[5] for r in outs})
+        n_cp = len(pair_n)
+        signals = {
+            "n_transfers": len(rows),
+            "n_in": len(ins),
+            "n_out": len(outs),
+            "n_counterparties": n_cp,
+            "receives_and_pays": bool(ins) and bool(outs),
+            "in_currencies": in_ccy,
+            "out_currencies": out_ccy,
+            "currency_switch": bool(in_ccy and out_ccy and not set(in_ccy) & set(out_ccy)),
+            "new_counterparty_share": round(sum(1 for k in pair_n if k not in before) / n_cp, 4)
+            if n_cp
+            else 0.0,
+            "one_time_counterparty_share": round(
+                sum(1 for v in pair_n.values() if v <= 2) / n_cp, 4
+            )
+            if n_cp
+            else 0.0,
+            "period_activity_share": round(len(rows) / total, 4) if total else 0.0,
+            "onward_within_24h_share": round(sum(1 for h in onward_hours if h <= 24) / len(ins), 4)
+            if ins
+            else 0.0,
+            "median_hours_to_onward": round(statistics.median(onward_hours), 1)
+            if onward_hours
+            else None,
+        }
+        rules = fired_rules(signals)
+        return {
+            "account": {"bank_id": args.bank_id, "account": args.account},
+            "window": {"start": _ts(start), "end": _ts(end)},
+            "signals": signals,
+            "rules": rules,
+            "score": account_score(rules),
             "capped": capped,
         }
 

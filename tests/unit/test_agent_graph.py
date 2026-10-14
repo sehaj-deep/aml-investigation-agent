@@ -80,6 +80,7 @@ def test_agent_tool_calls_go_through_mcp_only(tool_dir):
         "get_neighbors",
         "trace_funds",
         "get_transfers_among",
+        "get_account_behavior",
         "get_transactions",
     }
 

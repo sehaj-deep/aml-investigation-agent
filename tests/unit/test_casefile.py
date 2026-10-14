@@ -111,3 +111,11 @@ def test_one_off_relationships_are_marked_and_candidates_listed(case_file):
     assert c1["id"] == "C1" and c1["kind"] == "cycle"
     assert set(c1["accounts"]) == {"A0", label[(2, "FAN00001")], label[(3, "HOP00001")]}
     assert cf.graph["nodes"][0]["label"] == "A0" and cf.graph["edges"] and cf.graph["loops"]
+
+
+def test_case_file_reports_risk_indicators(case_file):
+    cf, client = case_file
+    assert "get_account_behavior" in client.calls
+    assert cf.risk["band"] in {"low", "medium", "high"}
+    assert cf.risk["subject"]["rules"] == ["R2", "R3", "R4", "R5"]
+    assert "Risk indicators (rules; score" in cf.text

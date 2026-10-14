@@ -35,6 +35,24 @@ export function PatternTag({ pattern }: { pattern: string | null | undefined }) 
   return t ? <Tooltip title={t.description}>{tag}</Tooltip> : tag
 }
 
+const BAND: Record<string, { color: string; text: string }> = {
+  high: { color: '#c53030', text: 'High' },
+  medium: { color: '#dd6b20', text: 'Medium' },
+  low: { color: '#2f855a', text: 'Low' },
+}
+
+export function RiskBadge({ score, band }: { score: number | null | undefined; band: string | null | undefined }) {
+  if (score === null || score === undefined || !band) return <Tag>Not scored</Tag>
+  const b = BAND[band] ?? { color: '#718096', text: band }
+  return (
+    <Tooltip title="Rules-based risk score: the subject's red flags plus its riskiest first-time counterparty's">
+      <Tag color={b.color} style={{ minWidth: 76, textAlign: 'center' }}>
+        {b.text} {score}
+      </Tag>
+    </Tooltip>
+  )
+}
+
 export function VerifiedBadge({ faithful }: { faithful: boolean | null | undefined }) {
   if (faithful === null || faithful === undefined)
     return (

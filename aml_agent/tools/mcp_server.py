@@ -121,6 +121,21 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
         )
 
     @mcp.tool(annotations=READ_ONLY)
+    def get_account_behavior(
+        bank_id: int,
+        account: str,
+        window_start: datetime | None = None,
+        window_end: datetime | None = None,
+    ) -> dict:
+        """Behavioral red flags for one account in a review period: whether it both receives
+        and pays, currency conversion, share of new and one-time counterparties, how
+        concentrated its activity is in the period, and how quickly incoming funds move
+        on; plus the risk rules (R1 to R6) these fire and the account's rule score."""
+        return tools().get_account_behavior(
+            bank_id=bank_id, account=account, window_start=window_start, window_end=window_end
+        )
+
+    @mcp.tool(annotations=READ_ONLY)
     def get_transactions(tx_ids: list[int]) -> dict:
         """Full records for up to 100 transactions by tx_id."""
         return tools().get_transactions(tx_ids=tx_ids)

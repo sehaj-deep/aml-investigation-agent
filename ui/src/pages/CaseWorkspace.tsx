@@ -27,10 +27,10 @@ import {
 import { ArrowLeftOutlined, LockOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { api, type CaseDetail, type Decision, type Evidence } from '../api'
-import { ActionTag, PatternTag, StatusTag, VerifiedBadge } from '../components/badges'
+import { ActionTag, PatternTag, RiskBadge, StatusTag, VerifiedBadge } from '../components/badges'
 import NetworkGraph from '../components/NetworkGraph'
 import { useUser } from '../user'
-import { DECISION_LABEL, DECISION_PAST, typologyName } from '../terms'
+import { DECISION_LABEL, DECISION_PAST, RISK_RULES, typologyName } from '../terms'
 
 const LIVE = new Set(['queued', 'running', 'decision_recorded'])
 
@@ -102,6 +102,7 @@ export default function CaseWorkspace() {
               {c.case_id}
             </Typography.Title>
             <StatusTag status={c.status} />
+            <RiskBadge score={c.analysis?.risk?.score} band={c.analysis?.risk?.band} />
             {LIVE.has(c.status) && <Badge status="processing" text="updating" />}
             <Descriptions size="small" column={5} style={{ minWidth: 760 }}>
               <Descriptions.Item label="Alert">
@@ -221,6 +222,7 @@ export default function CaseWorkspace() {
 
           <Col xs={24} xl={9}>
             <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <RiskCard c={c} />
               <AssessmentCard c={c} />
               <DecisionCard c={c} />
             </Space>
@@ -228,6 +230,55 @@ export default function CaseWorkspace() {
         </Row>
       </Space>
     </div>
+  )
+}
+
+function RuleList({ codes }: { codes: string[] }) {
+  if (codes.length === 0) return <Typography.Text type="secondary">No red flags</Typography.Text>
+  return (
+    <Space direction="vertical" size={2}>
+      {codes.map((code) => (
+        <span key={code} style={{ fontSize: 12 }}>
+          <Tag color="red">{code}</Tag>
+          <b>{RISK_RULES[code]?.title ?? code}</b>
+          <Typography.Text type="secondary"> {RISK_RULES[code]?.description}</Typography.Text>
+        </span>
+      ))}
+    </Space>
+  )
+}
+
+function RiskCard({ c }: { c: CaseDetail }) {
+  const risk = c.analysis?.risk
+  return (
+    <Card size="small" title={<span className="panel-title">Risk indicators (rules)</span>}>
+      {!risk ? (
+        <Empty description={LIVE.has(c.status) ? 'Scoring in progress' : 'Not scored'} />
+      ) : (
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Space>
+            <RiskBadge score={risk.score} band={risk.band} />
+            <Typography.Text type="secondary">
+              Subject {risk.subject.score} + riskiest first-time counterparty {risk.top_counterparty?.score ?? 0}
+            </Typography.Text>
+          </Space>
+          <div>
+            <div className="panel-title" style={{ marginBottom: 4 }}>
+              Subject (A0)
+            </div>
+            <RuleList codes={risk.subject.rules} />
+          </div>
+          {risk.top_counterparty && risk.top_counterparty.score > 0 && (
+            <div>
+              <div className="panel-title" style={{ marginBottom: 4 }}>
+                Riskiest first-time counterparty ({risk.top_counterparty.label})
+              </div>
+              <RuleList codes={risk.top_counterparty.rules} />
+            </div>
+          )}
+        </Space>
+      )}
+    </Card>
   )
 }
 
