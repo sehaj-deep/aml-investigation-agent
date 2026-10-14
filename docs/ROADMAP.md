@@ -34,6 +34,7 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 - Reads the case file and detection reasons; recommends escalate, close or more information, with reasons; drafts a suspicious-activity-style narrative.
 - Measured on clearing false alarms safely (benign alerts closed without missing real ones), narrative quality, and cost.
 - Ablations: no LLM, no case file.
+- **Investigator copilot.** A chat agent attached to each case: the investigator asks questions ("who else did A4 pay?", "is this amount unusual for this account?", "show the money trail from A7") and the agent answers by calling the read-only MCP tools live, citing the transactions it used. Same controls as the case agent: bounded tools, step and token budgets, every call in the audit log, answers checked by the verifier, no write actions. Measured on a small set of scripted investigator questions with known answers (correct answer, tool calls, latency, cost).
 
 **E. Guidance retrieval** (was PRD Sprint 3)
 - Public AML typology guidance (FATF, FinCEN, FINTRAC), hybrid search, jurisdiction filter; narratives cite passages that are verified to exist.
@@ -41,7 +42,7 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 **F. Case management UI (React)**
 - React, TypeScript and Vite, served as a `ui` container behind the existing API.
 - Enterprise look and feel modeled on common financial-crime case managers: dense data grids, a network view of the case, clear status and risk badges, keyboard-friendly review.
-- Screens: alert queue (risk score, reason codes, status, age, assignee); case workspace (subject profile, interactive network graph of the case file with the pattern highlighted, transactions and evidence grid, AI narrative with verification and citation badges, decision panel with reason codes, second-reviewer approval for escalations); audit timeline; operations dashboard (alert volumes, false-alarm rate, model metrics); model governance page (model and prompt versions, evaluation results).
+- Screens: alert queue (risk score, reason codes, status, age, assignee); case workspace (subject profile, interactive network graph of the case file with the pattern highlighted, transactions and evidence grid, AI narrative with verification and citation badges, decision panel with reason codes, second-reviewer approval for escalations); copilot chat panel beside the case (streaming answers, the tool calls it made, cited transactions highlighted in the network and grid); audit timeline; operations dashboard (alert volumes, false-alarm rate, model metrics); model governance page (model and prompt versions, evaluation results).
 - Local login with roles (analyst, supervisor) for the four-eyes flow; no real authentication claims.
 
 **G. Final evaluation and hardening**
