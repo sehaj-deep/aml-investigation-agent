@@ -4,7 +4,7 @@ Run 2026-10-14 on the owner's machine (Windows 11, Docker Desktop WSL2, Python 3
 
 | Verify item | Result |
 |---|---|
-| Golden-number tests | 43 passed, 3 strict xfail (definition questions, expected values unchanged: block-size median 6.5 vs 7, sender-earlier-received 1,406 vs 1,395, one-country blocks 41 vs 39) |
+| Golden-number tests | All pass. Three PRD numbers were wording differences, not data problems; on 2026-10-14 the owner adopted the measured values: block-size median 6.5 (PRD 7), sender-earlier-received 1,406 (PRD 1,395), one-country blocks 41 (PRD 39). None is used by any logic |
 | Two conversion runs give identical checksums | Yes: all 8 Parquet files byte-identical (second run into a separate folder, and again in the fresh clone) |
 | Fresh clone starts the stack from scratch | Yes: clone, install with hashes, lint, 8 CI tests, conversion (checksums equal the original), alerts regenerate identically, 48 data tests pass + 3 xfail, Postgres healthy with pgvector 0.8.0 |
 | Tool-query latency p95 in the real Docker setup | 222 ms from Parquet over the bind mount, 19 ms in memory (target under 1 s). Details: docs/decisions/0007 |
@@ -30,4 +30,4 @@ no em dashes anywhere....................................................Failed
 hook_test.md:1:Hook test [em dash] should be rejected
 ```
 
-Not done: release tag v0.1.0 (waiting for the owner to review this file and the three definition questions).
+Tagged v0.1.0.

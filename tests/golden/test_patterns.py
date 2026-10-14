@@ -9,10 +9,6 @@ from tests.golden import expected as E
 
 pytestmark = pytest.mark.data
 
-# Open definition questions (see NOTES_FOR_YOU.md). Expected values are unchanged;
-# strict xfail makes the test fail loudly if it starts passing.
-PENDING = "definition question pending owner decision; expected value not edited"
-
 
 def by_type(con, where: str = "TRUE") -> dict:
     return dict(
@@ -62,7 +58,6 @@ def test_single_row_blocks_are_degree_one(con):
     assert bad == 0
 
 
-@pytest.mark.xfail(strict=True, reason=PENDING + " (median 6.5 vs 7)")
 def test_block_sizes(con):
     lo, hi, med = con.execute(
         "SELECT min(n_tx), max(n_tx), median(n_tx) FROM pattern_blocks"
@@ -151,7 +146,6 @@ def test_other_sender_earlier_received_labeled(con):
     assert n == E.OTHER_SENDER_EARLIER_RECEIVED_LABELED
 
 
-@pytest.mark.xfail(strict=True, reason=PENDING + " (1406 vs 1395)")
 def test_pattern_sender_earlier_received_labeled(con):
     n = scalar(con, SENDER_EARLIER_RECEIVED.format(rows="pattern_transactions"))
     assert n == E.PATTERN_ROWS_SENDER_EARLIER_RECEIVED_LABELED
@@ -201,7 +195,6 @@ def test_other_laundering_structure(con):
     assert shape(larger[1]) == E.OTHER_SECOND_GROUP
 
 
-@pytest.mark.xfail(strict=True, reason=PENDING + " (41 vs 39)")
 def test_blocks_by_country(con):
     one_country, canada = con.execute(
         """

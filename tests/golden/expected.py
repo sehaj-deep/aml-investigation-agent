@@ -1,7 +1,7 @@
 """Golden numbers, copied from docs/PRD.md Appendix A and the Sprint 0 Verify list.
 
 Never edit a value here to make a test pass. A mismatch is a finding: stop and
-report it.
+report it. Values marked "owner decision" were changed only with the owner's approval.
 """
 
 from datetime import datetime
@@ -79,13 +79,14 @@ MULTI_ROW_BLOCKS_BY_TYPE = {
 }
 BLOCK_SIZE_MIN = 1
 BLOCK_SIZE_MAX = 32
-BLOCK_SIZE_MEDIAN = 7
+BLOCK_SIZE_MEDIAN = 6.5  # owner decision 2026-10-14: measured value adopted (PRD said 7)
 BLOCK_ACCOUNTS_MEDIAN = 8
 
 PATTERN_ACCOUNTS = 3_170
 PATTERN_ACCOUNTS_IN_MANY_BLOCKS = 100
 MULTI_ROW_BLOCKS_SHARING_AN_ACCOUNT = 138
-PATTERN_ROWS_SENDER_EARLIER_RECEIVED_LABELED = 1_395
+# owner decision 2026-10-14: measured value adopted (PRD said 1,395)
+PATTERN_ROWS_SENDER_EARLIER_RECEIVED_LABELED = 1_406
 
 SEED_ELIGIBLE_BLOCKS = 245
 SEED_ELIGIBLE_BLOCKS_BY_TYPE = {
@@ -129,5 +130,7 @@ CURRENCY_SHARE_BY_LABEL = {
     "Crytpo": ("Bitcoin", 100),
 }
 
-BLOCKS_IN_ONE_COUNTRY = 39
+# owner decision 2026-10-14: measured value adopted (PRD said 39; 41 counts the
+# US-style banks as one country)
+BLOCKS_IN_ONE_COUNTRY = 41
 BLOCKS_TOUCHING_CANADA = 58
