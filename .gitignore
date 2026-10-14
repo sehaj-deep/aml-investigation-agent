@@ -1,5 +1,5 @@
 # Data: never commit the dataset or derived files (CDLA-Sharing 1.0)
-data/
+/data/
 *.csv
 *.parquet
 *.duckdb
