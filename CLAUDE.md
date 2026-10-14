@@ -48,6 +48,11 @@ Activate the venv first (`.venv/Scripts/activate`). `make` is not installed on t
 - `make alerts`: `python scripts/build_alerts.py`
 - `make up` / `make down`: `docker compose up -d --wait` / `docker compose down`
 - `make latency`: `docker compose --profile bench run --rm bench`
+- Relock dependencies: `python scripts/lock.py` (adds Windows-only markers; never run plain pip-compile)
+- Stack: `docker compose up -d --wait` starts postgres, mcp-graph, api (http://127.0.0.1:8000) and agent-worker
+- Local processes: `python -m aml_agent.tools.mcp_server --http`, `python -m aml_agent.api`, `python -m aml_agent.worker` (on Windows set `MCP_URL`)
+- Bake-off (dev alerts only): `python scripts/bakeoff.py --models <tag1>,<tag2> --n 20`
+- Docker tests: `python -m pytest -m docker` (uses database `aml_test`)
 
 ## Definition of done for a sprint
 1. The sprint's **Verify** checks in the PRD have been run and the output shown to me, not only written as tests.

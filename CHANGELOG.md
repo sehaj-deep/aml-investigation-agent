@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased: Sprint 1 (investigation agent), pending owner review and a live model
+- Read-only tool database (no labels) and four bounded graph tools served over MCP: get_account_summary, get_neighbors, trace_funds, get_transactions.
+- LangGraph workflow: triage, tool loop with step, tool-call and token budgets, hypothesize, draft, human-approval interrupt, finalize (refused without a decision). Postgres checkpoints; evidence rows filled by code from tx_ids.
+- Provider interface with Ollama and a deterministic scripted provider; bake-off harness on dev alerts.
+- FastAPI cases and review API (no finalize endpoint), Postgres work queue, agent worker; Docker services mcp-graph, api, agent-worker.
+- Kill-and-resume verified; bake-off and false-escalation count wait for a live model.
+
 ## Unreleased: Sprint 0 (foundation), pending owner review before tag v0.1.0
 - Scaffolding: packaging, pip-tools lockfiles with hashes, ruff, pytest, pre-commit hooks rejecting em dashes and AI co-author lines (both proven to reject), CI workflow with no data and no LLM calls.
 - Data layer: DuckDB conversion of HI-Small to Parquet (`tx_id` = original row number, integer and raw bank IDs, DECIMAL amounts, `is_self_transfer`), deterministic byte-identical output with a checksum manifest.
