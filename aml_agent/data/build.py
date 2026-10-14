@@ -19,6 +19,7 @@ from aml_agent.data.accounts import build_accounts
 from aml_agent.data.convert import ROW_GROUP_SIZE, convert_transactions
 from aml_agent.data.derived import build_derived
 from aml_agent.data.patterns import build_pattern_tables, parse_patterns
+from aml_agent.data.tooldb import build_tool_db
 
 DERIVED_TABLES = [
     "accounts",
@@ -76,4 +77,7 @@ def build_all(data_dir: Path | None = None, out_dir: Path | None = None) -> dict
         "transactions_rows": n_tx,
     }
     (out_dir / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    # The read-only database the graph tools open (no labels). Not in the manifest:
+    # DuckDB files are not byte-stable; it is derived from the checksummed Parquet.
+    build_tool_db(out_dir)
     return manifest
