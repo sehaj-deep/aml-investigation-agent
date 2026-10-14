@@ -17,3 +17,10 @@ Status: accepted (Sprint 1), pending owner review
 ## Update 2026-10-14: giveaways hidden (owner decision)
 
 Two signals reveal the label without investigation: payment format (nearly all laundering is ACH) and dates after Sep 10 (only laundering, per the dataset author). Both are hidden from the tools by default (`TOOLS_SHOW_PAYMENT_FORMAT=false`, `TOOLS_SHOW_LATE_ROWS=false`): windows are clipped to 2022-09-10 23:59 and `get_transactions` treats later rows as not found. This is also realistic, since an investigator on Sep 10 cannot see the future. Both stay switchable so one comparison run can show how much each giveaway would inflate results. The verifier still checks citations against the full Parquet data.
+
+## Update 2026-10-14: hub hints and a group-transfers tool
+
+Live runs on dev alerts showed the small model missing hub accounts and citing the seed's ordinary activity. Two plain-code tool additions help any model:
+- `get_neighbors` reports, for each counterparty, `their_senders` and `their_receivers` (distinct accounts it is paid by and pays in the window), so a hub stands out without one lookup per account.
+- `get_transfers_among(accounts, window)` returns only transfers whose sender and receiver are both in a chosen group (2 to 30 accounts, at most 300 transfers), plus group accounts with no link to the rest. The agent uses it to collect a pattern's own transfers as evidence.
+Both are read-only, bounded and validated like the other tools.
