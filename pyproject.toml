@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aml-agent"
+version = "0.1.0"
+description = "AML investigation agent over synthetic AMLworld data (portfolio project)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb",
+    "pydantic>=2",
+    "python-dotenv",
+]
+
+[tool.setuptools.packages.find]
+include = ["aml_agent*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "data: needs the converted Parquet files (not run in CI)",
+    "docker: needs the Docker Compose stack (not run in CI)",
+]
+addopts = "-ra"

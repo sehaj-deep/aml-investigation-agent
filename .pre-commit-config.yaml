@@ -1,0 +1,31 @@
+default_install_hook_types: [pre-commit, commit-msg]
+repos:
+  - repo: local
+    hooks:
+      - id: no-em-dash
+        name: no em dashes anywhere
+        language: pygrep
+        entry: "\u2014"
+        types: [text]
+      - id: no-ai-coauthor
+        name: no AI co-author or generator line in commit messages
+        language: pygrep
+        entry: '(?i)^co-authored-by:|^claude-session:|generated with \[?claude|claude\.ai/code/session'
+        stages: [commit-msg]
+      - id: ruff-check
+        name: ruff check
+        language: system
+        entry: ruff check
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        language: system
+        entry: ruff format --check
+        types: [python]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
