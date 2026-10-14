@@ -108,6 +108,12 @@ async def run_set(name: str, limit: int | None) -> list[dict]:
                     "evidence_coverage": coverage,
                     "wall_ms": round(wall_ms, 1),
                     "error": error,
+                    # Rejected or failed agent tool calls, for debugging tool-call validity.
+                    "tool_errors": [
+                        {"name": e["name"], "arguments": e["arguments"], "error": e["error"]}
+                        for e in values.get("tool_log", [])
+                        if e.get("by") == "agent" and not e.get("ok")
+                    ],
                     **(case_metrics(values) if values else {}),
                 }
             )
