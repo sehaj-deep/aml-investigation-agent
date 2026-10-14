@@ -62,3 +62,21 @@ Per alert (p3 answers): dev-0001 fan-in: fan-in, stack, fan-in. dev-0002 benign:
 - Benign handling is good on this sample (no false escalation), but only one benign alert was in it.
 - With six alerts, a single repeat can swing accuracy by 50 points. Reliable comparisons need the full dev set and repeats.
 - The small model's reasoning, not the tools, is the main limit. The next experiment is the same alerts on a stronger model.
+
+## Follow-up 2: code-built case file and code-collected evidence (prompt p4, commit 37c806c)
+
+Same 6 dev alerts x 3 on `gpt-oss:20b-cloud`; 18 runs, about 388,000 tokens.
+
+| Prompt | Runs | Pattern accuracy | Evidence coverage | Evidence precision | Seen coverage | Model tool calls | Tokens per case | False escalations |
+|---|---|---|---|---|---|---|---|---|
+| p2 | 9 | 0.22 | 0.24 | 0.13 | 0.75 | 49 | 40,493 | 0 of 1 |
+| p3 | 18 | 0.39 | 0.20 | 0.19 | 0.66 | 81 | 48,279 | 0 of 3 |
+| p4 | 18 | **0.61** | **0.52** | **0.35** | 1.00 | 0 | **21,574** | 0 of 3 |
+
+p4 spread across repeats: pattern accuracy 1.00, 0.50, 0.33 (mean 0.61, sd 0.28); coverage mean 0.52 (sd 0.19); precision mean 0.35 (sd 0.09); runs agreed with their alert's majority answer 72% of the time (p3: 56%).
+
+- The cycle alert (dev-0004) went from never right to right 3 of 3 times with 100% coverage, thanks to the loop detection.
+- The benign alert was closed every time.
+- The model made no tool calls: the case file was enough for it, which also halved the tokens per case.
+
+**Remaining failure mode.** The model often treats the seed's ordinary counterparties as the pattern or names only part of a hub's group. dev-0003: the pattern runs through hub A13 and its contacts A87 to A93, all in the case file, but the model named the seed's own contacts A1 to A12. dev-0005 and dev-0006: the model found the hub A4 but named only one or two of its 12 to 26 members. Identifying which group of accounts forms the pattern is the job of the planned deterministic pattern identification (roadmap phase C).
