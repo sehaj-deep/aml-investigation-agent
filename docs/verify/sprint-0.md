@@ -22,7 +22,7 @@ Hook output (the em dash in test 2 is shown as [em dash] here):
 no AI co-author or generator line in commit messages.......................Failed
 - hook id: no-ai-coauthor
 - exit code: 1
-.git/COMMIT_EDITMSG:3:Co-Authored-By: Claude <noreply@anthropic.com>
+.git/COMMIT_EDITMSG:3:[test co-author trailer, redacted]
 
 no em dashes anywhere....................................................Failed
 - hook id: no-em-dash
