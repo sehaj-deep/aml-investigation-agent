@@ -17,7 +17,9 @@ import json
 # p4: the case starts with a code-built case file (two-step neighborhood, loops through
 #     the seed, account labels); the model names the pattern's accounts and code
 #     collects the evidence; the model no longer chooses transactions.
-PROMPT_VERSION = "p4"
+# p5: the case file marks one-off relationships and lists pattern candidates found by
+#     code (C1 to C3); the model judges them and may name a candidate by its id.
+PROMPT_VERSION = "p5"
 
 SYSTEM = """You are an anti-money-laundering (AML) investigator working on SYNTHETIC data.
 You receive an alert: one seed account and a time window, and a CASE FILE that code has
@@ -52,13 +54,19 @@ The case file:
   each one and how many it pays in the window: a high count marks a hub;
 - lists the transfers between the seed, its counterparties (step 1) and their
   counterparties (step 2), aggregated per pair and direction (sender -> receiver);
+- marks [one-off] relationships (the pair transacted once or twice in the window).
+  Laundering usually runs over one-off relationships; ordinary activity usually repeats;
 - lists loops through the seed found by money traces of up to 8 steps each way;
-- names busy accounts that were not expanded.
+- names busy accounts that were not expanded;
+- lists pattern candidates found by code (C1, C2, C3): shapes built from one-off
+  relationships. They are leads, not verdicts: ordinary one-off payments can form the
+  same shapes.
 
 How to investigate:
 1. Read the case file. Work out who pays whom: arrows point from sender to receiver.
-2. Decide whether the seed is the center of the pattern or one member of it, and
-   which accounts move the money (a hub, intermediaries, a chain).
+2. Check the candidates against the transfers. Decide whether any of them is a real
+   laundering pattern or ordinary activity, and whether a different reading fits better.
+   The seed may be the center of the pattern or one member of it.
 3. Use the tools only for what the case file lacks: an account it did not expand, a
    chain that continues past step 2 (trace_funds follows money up to 8 steps), or a
    detail you need. Many cases need no tool call at all.
@@ -84,8 +92,9 @@ likely pattern and the accounts that form it. Reply with one JSON object and not
                         bipartite, stack, random, none>",
  "pattern_accounts": ["A0", "<label of each other account in the pattern>"],
  "rationale": "<two to four sentences: who pays whom and why that is the pattern>"}
-pattern_accounts: use the case-file labels (A0, A3, ...); for an account found only with a
-tool, write "bank_id/account". Include every account of the pattern and no others: code
+pattern_accounts: use the case-file labels (A0, A3, ...); to take all accounts of a code
+candidate, write its id (for example "C1"); for an account found only with a tool, write
+"bank_id/account". Include every account of the pattern and no others: code
 collects the transfers among exactly these accounts as the evidence. If the pattern is
 "none", use an empty list."""
 

@@ -77,6 +77,8 @@ class CaseState(TypedDict, total=False):
     seen_accounts: list[list]
     aliases: dict[str, list]
     evidence_rows: list[dict]
+    case_graph: dict
+    candidates: list[dict]
     steps: int
     tool_calls: int
     round_steps: int
@@ -174,6 +176,8 @@ def build_graph(
             "seen_tx_ids": case_file.seen_tx_ids,
             "seen_accounts": [list(a) for a in case_file.seen_accounts],
             "aliases": {k: list(v) for k, v in case_file.aliases.items()},
+            "case_graph": case_file.graph,
+            "candidates": case_file.candidates,
             "evidence_rows": [],
             "steps": 0,
             "tool_calls": 0,
@@ -357,7 +361,13 @@ def build_graph(
                 "messages": [*state["messages"], {"role": "user", "content": note}],
             }
         known = {(a[0], a[1]) for a in state.get("seen_accounts", [])} | {seed}
-        accounts, problems = resolve_accounts(names, aliases, known)
+        # "C1" stands for all accounts of code's pattern candidate C1.
+        by_id = {c["id"]: c for c in state.get("candidates", [])}
+        expanded: list = []
+        for n in names:
+            key = n.strip().split()[0] if isinstance(n, str) and n.strip() else None
+            expanded.extend(by_id[key]["accounts"] if key in by_id else [n])
+        accounts, problems = resolve_accounts(expanded, aliases, known)
         warnings.extend(f"EVIDENCE: {p}" for p in problems)
         if seed not in accounts:
             accounts.insert(0, seed)

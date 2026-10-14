@@ -24,6 +24,11 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
+from aml_agent.analysis.patterns import (
+    ONE_OFF_MAX_TRANSFERS,
+    describe,
+    find_candidates,
+)
 from aml_agent.tools.client import GraphClient
 
 SEED_NEIGHBOR_LIMIT = 100
@@ -47,6 +52,11 @@ class CaseFile:
     seen_tx_ids: list[int]
     seen_accounts: list[Account]
     tool_log: list[dict] = field(default_factory=list)
+    # Structured network for analytics and the UI: nodes, edges (aggregated per pair and
+    # direction, with up to 20 tx_ids each) and loops through the seed.
+    graph: dict = field(default_factory=dict)
+    # Ranked pattern candidates found by code (aml_agent/analysis/patterns.py).
+    candidates: list[dict] = field(default_factory=list)
 
 
 def _short(amount: str) -> str:
@@ -90,6 +100,7 @@ class _Builder:
                     "totals": c["totals"],
                     "first": c["first_ts"],
                     "last": c["last_ts"],
+                    "tx_ids": c["tx_ids"],
                 }
             self.tx_ids.extend(c["tx_ids"])
 
@@ -260,8 +271,10 @@ async def build_case_file(client: GraphClient, alert: dict) -> CaseFile:
             lines.append(f"... {len(b.edges) - MAX_TRANSFER_LINES} more pairs not shown")
             break
         when = e["first"] if e["first"] == e["last"] else f"{e['first']} to {e['last']}"
+        one_off = " [one-off]" if e["n_tx"] <= ONE_OFF_MAX_TRANSFERS else ""
         lines.append(
-            f"{b.aliases[src]} -> {b.aliases[dst]}: {e['n_tx']} tx, {_totals(e['totals'])}, {when}"
+            f"{b.aliases[src]} -> {b.aliases[dst]}: {e['n_tx']} tx, {_totals(e['totals'])}, "
+            f"{when}{one_off}"
         )
     lines.append("")
     if trips:
@@ -285,8 +298,39 @@ async def build_case_file(client: GraphClient, alert: dict) -> CaseFile:
     if step1 and step1.get("truncated"):
         lines.append("The seed has more counterparties than shown.")
 
+    graph = {
+        "nodes": [
+            {
+                "label": alias,
+                "bank_id": acc[0],
+                "account": acc[1],
+                **{k: b.info[acc].get(k) for k in ("hop", "senders", "receivers", "jurisdiction")},
+            }
+            for acc, alias in b.aliases.items()
+        ],
+        "edges": [
+            {"src": b.aliases[src], "dst": b.aliases[dst], **e} for (src, dst), e in b.edges.items()
+        ],
+        "loops": [
+            [
+                {
+                    "tx_id": e["tx_id"],
+                    "src": b.aliases[_src(e)],
+                    "dst": b.aliases[_dst(e)],
+                    "ts": e["ts"],
+                }
+                for e in path
+            ]
+            for path in trips
+        ],
+    }
+    candidates = find_candidates(graph)
+    lines.append("")
+    lines.append(describe(candidates))
     return CaseFile(
         text="\n".join(lines),
+        graph=graph,
+        candidates=[c.as_dict() for c in candidates],
         aliases={alias: acc for acc, alias in b.aliases.items()},
         seen_tx_ids=list(dict.fromkeys(b.tx_ids)),
         seen_accounts=list(b.aliases),

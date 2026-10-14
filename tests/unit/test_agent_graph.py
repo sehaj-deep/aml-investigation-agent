@@ -187,3 +187,15 @@ def test_evidence_is_the_transfers_among_the_named_accounts(tool_dir):
         assert (int(e["to_bank"]), e["to_account"]) in accounts
     assert [e["tx_id"] for e in evidence] == paused.values["cited_tx_ids"]
     assert paused.values["verification"] is None or paused.values["verification"]["faithful"]
+
+
+def test_naming_a_code_candidate_collects_its_transfers(tool_dir):
+    paused = run(tool_dir, "candidate", start)
+    c1 = paused.values["candidates"][0]
+    assert paused.values["hypothesis"]["pattern_hypothesis"] == c1["kind"] == "cycle"
+    aliases = paused.values["aliases"]
+    accounts = {(aliases[a][0], aliases[a][1]) for a in c1["accounts"]}
+    evidence = paused.values["case"]["evidence"]
+    assert evidence
+    assert {(int(e["from_bank"]), e["from_account"]) for e in evidence} <= accounts
+    assert {(int(e["to_bank"]), e["to_account"]) for e in evidence} <= accounts

@@ -99,3 +99,15 @@ def test_resolve_accounts():
     assert accounts == [(1, "SEED0001"), (2, "FAN00001"), (3, "HOP00001")]
     assert len(problems) == 3
     assert any("never returned by a tool" in p for p in problems)
+
+
+def test_one_off_relationships_are_marked_and_candidates_listed(case_file):
+    cf, _ = case_file
+    label = {acc: alias for alias, acc in cf.aliases.items()}
+    assert f"{label[(2, 'FAN00001')]} -> {label[(3, 'HOP00001')]}: 1 tx, 90 US Dollar" in cf.text
+    assert "[one-off]" in cf.text
+    assert "Pattern candidates found by code" in cf.text
+    c1 = cf.candidates[0]
+    assert c1["id"] == "C1" and c1["kind"] == "cycle"
+    assert set(c1["accounts"]) == {"A0", label[(2, "FAN00001")], label[(3, "HOP00001")]}
+    assert cf.graph["nodes"][0]["label"] == "A0" and cf.graph["edges"] and cf.graph["loops"]

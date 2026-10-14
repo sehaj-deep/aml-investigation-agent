@@ -12,6 +12,7 @@ Policies (LLM_SCRIPT_POLICY):
   bad_json   first hypothesis reply is not JSON, then valid
   emdash     the drafted summary contains an em dash (tests the guard)
   none       concludes "none" and recommends closing
+  candidate  adopts code's top pattern candidate (C1)
 """
 
 from __future__ import annotations
@@ -40,6 +41,14 @@ def _labels(messages: list[dict]) -> list[str]:
         if m["role"] == "user" and "CASE FILE" in m["content"]:
             return re.findall(r"^(A\d+) = ", m["content"], re.M)
     return []
+
+
+def _top_candidate(messages: list[dict]) -> str | None:
+    """Kind of code's top pattern candidate (C1) in the case file, if any."""
+    for m in messages:
+        if m["role"] == "user" and (match := re.search(r"^C1: ([a-z-]+);", m["content"], re.M)):
+            return match.group(1)
+    return None
 
 
 def _phase(messages: list[dict]) -> str:
@@ -117,11 +126,14 @@ class ScriptedProvider:
             return ChatResponse(content="I think this is a fan-out pattern.")
         none = self.policy == "none"
         labels = _labels(messages)
+        pattern, accounts = "fan-out", labels[:3]
+        if self.policy == "candidate" and (top := _top_candidate(messages)):
+            pattern, accounts = top, ["C1"]
         return ChatResponse(
             content=json.dumps(
                 {
-                    "pattern_hypothesis": "none" if none else "fan-out",
-                    "pattern_accounts": [] if none else labels[:3],
+                    "pattern_hypothesis": "none" if none else pattern,
+                    "pattern_accounts": [] if none else accounts,
                     "rationale": "Scripted rationale based on the counterparties found.",
                 }
             )
