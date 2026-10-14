@@ -29,7 +29,7 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 - Config-driven rules with reason codes: fan-in and fan-out bursts on new (one-off) counterparties, rapid pass-through, round trips, structuring-like amounts, velocity, cross-border and currency mismatch.
 - An explainable risk score: a weighted sum of rule hits, with each contribution shown to the investigator.
 - Alerts with a risk score and reason codes become the case source; the label-built sets stay as a controlled benchmark.
-- Payment format excluded from headline numbers; rows after Sep 10 excluded.
+- Payment format and rows after Sep 10 are used, with figures without them reported alongside (decision 0013).
 - Metrics: precision and recall of alerts against the labels, precision at the top of the queue, alerts per true case, and per-rule hit rates.
 
 **C. Graph pattern identification**
@@ -52,7 +52,7 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 - Local login with roles (analyst, supervisor) for the four-eyes flow; no real authentication claims.
 
 **H. Later, optional: ML detection**
-- Done early, approved by the owner (2026-10-14): an open-source XGBoost model on account features, chronological split, compared against the rules (decision 0012, scorecard part A). It generates the alert queue for the investigation evaluation.
+- Done early, approved by the owner (2026-10-14): an open-source XGBoost transaction monitoring model on IBM's split, compared against the rules and the paper (decision 0013, scorecard part A). It generates the alert queue for the investigation evaluation.
 
 **G. Final evaluation and hardening**
 - Freeze, then run the untouched evaluation set once on the chosen model; report with repeats and spreads.

@@ -5,7 +5,7 @@ Synthetic data only; this is not a production system. Assets: integrity of case 
 | Threat | Control | Residual risk |
 |---|---|---|
 | Model writes or deletes data | Tools open a DuckDB file with `read_only=True`; no write tool exists; MCP refuses unknown tools | None found in tests |
-| Model sees labels or ground truth | Tool DB holds no `is_laundering` column and no pattern or alert-truth tables; ground-truth files excluded from images | Payment format correlates with labels; hidden by default |
+| Model sees labels or ground truth | Tool DB holds no `is_laundering` column and no pattern or alert-truth tables; ground-truth files excluded from images | Payment format correlates with labels; shown, as analysts see it, and switchable off for comparison (decision 0013) |
 | Unbounded queries exhaust resources | Caps on hops, rows, windows and fan-out; Pydantic validation | Many small calls; limited by step and tool-call budgets |
 | Model invents transactions or amounts | Model cites tx_ids only; code fetches evidence; verifier checks existence and every field against Parquet; grounding check | Narrative prose could still misstate numbers (not checked yet) |
 | Case finalized without a human | Interrupt before finalize; finalize refuses without approve or reject; no finalize endpoint; decisions only on `pending_review` cases | Reviewer identity is self-declared (no auth in this phase) |

@@ -69,10 +69,12 @@ def test_tx_ids_are_capped(tools):
     assert len(out["transactions"]) + len(out["not_found"]) == graph.MAX_TX_IDS
 
 
-def test_long_window_is_capped(tools):
-    out = tools.get_account_summary(
-        **SEED, window_start="2022-09-01T00:00", window_end="2023-09-01T00:00"
-    )
+def test_long_window_is_capped(tools, monkeypatch):
+    window = {"window_start": "2022-09-01T00:00", "window_end": "2023-09-01T00:00"}
+    out = tools.get_account_summary(**SEED, **window)
+    assert out["window"]["end"] == "2022-09-19T00:00"  # clipped to the end of the data
+    monkeypatch.setenv("TOOLS_SHOW_LATE_ROWS", "false")
+    out = tools.get_account_summary(**SEED, **window)
     assert out["window"]["end"] == "2022-09-10T23:59"  # clipped to the primary period
 
 
@@ -130,23 +132,24 @@ def test_trace_respects_time_order(tools):
     assert [e["to_account"] for e in hop3] == ["SEED0001"]
 
 
-def test_payment_format_hidden_by_default(tools, monkeypatch):
-    out = tools.get_transactions(tx_ids=[1])
-    assert "payment_format" not in out["transactions"][0]
-    monkeypatch.setenv("TOOLS_SHOW_PAYMENT_FORMAT", "true")
+def test_payment_format_shown_unless_switched_off(tools, monkeypatch):
     out = tools.get_transactions(tx_ids=[1])
     assert out["transactions"][0]["payment_format"] == "Wire"
+    monkeypatch.setenv("TOOLS_SHOW_PAYMENT_FORMAT", "false")
+    out = tools.get_transactions(tx_ids=[1])
+    assert "payment_format" not in out["transactions"][0]
 
 
-def test_rows_after_primary_period_hidden_by_default(tools, monkeypatch):
+def test_rows_after_primary_period_can_be_hidden(tools, monkeypatch):
     late_id = synthetic.LATE_TX_ID
+    assert tools.get_transactions(tx_ids=[late_id])["transactions"][0]["tx_id"] == late_id
+    monkeypatch.setenv("TOOLS_SHOW_LATE_ROWS", "false")
     out = tools.get_account_summary(**SEED)
     assert "Swiss Franc" not in {s["currency"] for s in out["sent"]}
     assert tools.get_transactions(tx_ids=[late_id])["not_found"] == [late_id]
     neighbors = tools.get_neighbors(**SEED, direction="out")
     assert "LATE0001" not in {c["account"] for c in neighbors["counterparties"]}
-    monkeypatch.setenv("TOOLS_SHOW_LATE_ROWS", "true")
-    assert tools.get_transactions(tx_ids=[late_id])["transactions"][0]["tx_id"] == late_id
+    monkeypatch.delenv("TOOLS_SHOW_LATE_ROWS")
     out = tools.get_account_summary(**SEED)
     assert "Swiss Franc" in {s["currency"] for s in out["sent"]}
 

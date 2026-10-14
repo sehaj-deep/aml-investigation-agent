@@ -67,7 +67,7 @@ def test_loop_through_the_seed_is_reported(case_file):
     )
 
 
-def test_late_rows_stay_hidden(case_file):
+def test_rows_outside_the_alert_window_stay_out(case_file):
     cf, _ = case_file
     assert (3, "LATE0001") not in set(cf.aliases.values())
     assert synthetic.LATE_TX_ID not in cf.seen_tx_ids

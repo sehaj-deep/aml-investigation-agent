@@ -7,10 +7,10 @@ Every tool:
 - caps hops, rows and windows, and reports any cap it applied in `capped`;
 - reports amounts per currency and never sums across currencies;
 - hides self-transfers unless asked, and reports how many were hidden;
-- shows only the primary period (up to 2022-09-10 23:59) by default. The dataset
-  author notes that the days after Sep 10 contain only laundering, so showing them
-  would give the answer away (TOOLS_SHOW_LATE_ROWS=true shows them, for comparison);
-- hides payment format by default for the same reason (TOOLS_SHOW_PAYMENT_FORMAT).
+- shows what an analyst sees: every date and the payment format. Both are unusually
+  predictive in this simulator (rows after Sep 10 are mostly laundering, and most
+  laundering is ACH), so each can be hidden for a comparison run
+  (TOOLS_SHOW_LATE_ROWS=false clips to 2022-09-10 23:59, TOOLS_SHOW_PAYMENT_FORMAT=false).
 Amounts are returned as strings so no precision is lost.
 """
 
@@ -49,8 +49,8 @@ ACCOUNT_PATTERN = r"^[0-9A-Z]{1,20}$"
 
 
 def show_late_rows() -> bool:
-    """Rows after Sep 10 are all laundering (dataset author's note). Off by default."""
-    return os.environ.get("TOOLS_SHOW_LATE_ROWS", "false").lower() == "true"
+    """Rows after Sep 10 are mostly laundering in this simulator. On by default."""
+    return os.environ.get("TOOLS_SHOW_LATE_ROWS", "true").lower() == "true"
 
 
 def data_end() -> datetime:
@@ -58,8 +58,8 @@ def data_end() -> datetime:
 
 
 def show_payment_format() -> bool:
-    """Payment format nearly reveals the label in this dataset (PRD section 10). Off by default."""
-    return os.environ.get("TOOLS_SHOW_PAYMENT_FORMAT", "false").lower() == "true"
+    """Analysts see the payment format; it is unusually predictive here. On by default."""
+    return os.environ.get("TOOLS_SHOW_PAYMENT_FORMAT", "true").lower() == "true"
 
 
 class _Args(BaseModel):

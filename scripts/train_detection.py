@@ -1,16 +1,19 @@
-"""Train the detection model once, score the test period, and write explained alerts.
+"""Train the transaction monitoring model, score the test period, and write alerts.
 
     python -m pip install --require-hashes -r requirements-detection.txt
     python scripts/train_detection.py
 
+Two models are trained on IBM's 60/20/20 time split: one with payment format (the
+product model, since analysts see it) and one without (payment format is unusually
+predictive in this simulator). Both are compared with the red-flag rules.
+
 Outputs:
-- data/detection/model.json (gitignored): the trained model;
-- evals/runs/detection/model-<stamp>.json: metrics against the rules, on the test period;
-- evals/alerts/detection/alerts.jsonl: an alert queue for the investigation evaluation:
-  a seeded random sample of the accounts above the alert threshold (the top 2,000 of
-  the test period, about a quarter of them real laundering), with the factors behind
-  each score. Sampling from the queue, not taking only the top, keeps a realistic mix
-  of true and false alerts for measuring triage;
+- data/detection/model.json and model-no-format.json (gitignored);
+- evals/runs/detection/model-<stamp>.json: test-period metrics;
+- evals/alerts/detection/alerts.jsonl: an alert queue for the investigation
+  evaluation. An account is alerted when any of its test-period transactions scores
+  above the threshold chosen on validation; a seeded sample of those accounts is
+  written, each with its triggering transactions and the factors behind the top one;
 - evals/alerts/detection/ground_truth.jsonl: their labels, kept apart from the alerts.
 Accounts of the frozen label-built evaluation set are excluded from training and
 validation. No language model is used.
@@ -21,7 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -31,12 +34,15 @@ from aml_agent import config
 from aml_agent.alerts.io import read_alerts, read_truth
 from aml_agent.data.tooldb import tool_db_path
 from aml_agent.detection import model as dm
-from aml_agent.detection.features import FEATURES, build_currency_stats
+from aml_agent.detection.features import build_currency_stats
+from aml_agent.detection.transactions import build_history
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "evals" / "runs" / "detection"
 ALERTS = ROOT / "evals" / "alerts" / "detection"
 BUDGETS = (100, 250, 500, 1000, 2000)
+MAX_TRIGGERS = 25
+WINDOW_PAD = timedelta(hours=24)
 
 
 def connect() -> duckdb.DuckDBPyConnection:
@@ -66,149 +72,174 @@ def eval_set_accounts(con: duckdb.DuckDBPyConnection) -> set[tuple[int, str]]:
     return accounts
 
 
-def transaction_f1(con, data: dm.Dataset, scores: np.ndarray, start: datetime, end: datetime):
-    """Transaction-level precision, recall and F1 at every score cut.
+def concat(parts: list[dm.Dataset]) -> dm.Dataset:
+    return dm.Dataset(
+        tx_id=np.concatenate([p.tx_id for p in parts]),
+        ts=np.concatenate([p.ts for p in parts]),
+        sender=[a for p in parts for a in p.sender],
+        receiver=[a for p in parts for a in p.receiver],
+        x=np.vstack([p.x for p in parts]),
+        y=np.concatenate([p.y for p in parts]),
+    )
 
-    A transfer's score is the lower of its two accounts' scores: a laundering transfer
-    links two involved accounts, so both ends must look risky.
-    """
+
+def rules_score(data: dm.Dataset) -> np.ndarray:
+    """The rules' transaction score: the lower case score of its two accounts."""
+    i = dm.ALL_FEATURES.index
+
+    def case(prefix: str) -> np.ndarray:
+        s = data.x[:, i(f"{prefix}rule_score")] + data.x[:, i(f"{prefix}top_counterparty_score")]
+        return np.nan_to_num(s, nan=0.0)
+
+    return np.minimum(case("s_"), case("r_"))
+
+
+def evaluate(name, val_scores, validation, test_scores, test) -> dict:
+    """Threshold from validation, applied once to test; plus the optimistic best."""
+    threshold = dm.best_threshold(val_scores, validation.y)
+    primary = test.ts <= np.datetime64(dm.PRIMARY_END)
+    _, precision, recall, f1 = dm.f1_curve(test_scores, test.y)
+    best = int(np.argmax(f1))
+    return {
+        "scorer": name,
+        "average_precision": round(dm.average_precision(test_scores, test.y), 4),
+        "validation_average_precision": round(dm.average_precision(val_scores, validation.y), 4),
+        "threshold_from_validation": dm.at_threshold(test_scores, test.y, threshold),
+        "best_on_test_optimistic": {
+            "precision": round(float(precision[best]), 4),
+            "recall": round(float(recall[best]), 4),
+            "f1": round(float(f1[best]), 4),
+        },
+        "without_rows_after_sep_10": dm.at_threshold(
+            test_scores[primary], test.y[primary], threshold
+        ),
+    }
+
+
+def account_scores(con, test: dm.Dataset, scores: np.ndarray):
+    """Each test-period account's highest transaction score, and whether it laundered."""
     con.register(
-        "acct_scores",
+        "scored",
         {
-            "b": np.array([b for b, _ in data.accounts], dtype=np.int64),
-            "a": np.array([a for _, a in data.accounts], dtype=object),
+            "sb": np.array([b for b, _ in test.sender], dtype=np.int64),
+            "sa": np.array([a for _, a in test.sender], dtype=object),
+            "rb": np.array([b for b, _ in test.receiver], dtype=np.int64),
+            "ra": np.array([a for _, a in test.receiver], dtype=object),
             "p": scores.astype(float),
+            "y": test.y.astype(np.int64),
         },
     )
     rows = con.execute(
         """
-        SELECT least(COALESCE(s.p, 0), COALESCE(r.p, 0)) AS score, l.is_laundering
-        FROM transactions t JOIN labels l USING (tx_id)
-        LEFT JOIN acct_scores s ON s.b = t.from_bank AND s.a = t.from_account
-        LEFT JOIN acct_scores r ON r.b = t.to_bank AND r.a = t.to_account
-        WHERE NOT t.is_self_transfer AND t.ts BETWEEN ? AND ?
-        """,
-        [start, end],
+        SELECT b, a, max(p) AS p, max(y) AS y FROM (
+            SELECT sb AS b, sa AS a, p, y FROM scored
+            UNION ALL
+            SELECT rb, ra, p, y FROM scored WHERE NOT (rb = sb AND ra = sa))
+        GROUP BY ALL ORDER BY b, a
+        """
     ).fetchall()
-    con.unregister("acct_scores")
-    s = np.array([r[0] for r in rows])
-    y = np.array([1 if r[1] else 0 for r in rows])
-    order = np.argsort(-s, kind="stable")
-    tp = np.cumsum(y[order])
-    k = np.arange(1, len(s) + 1)
-    precision = tp / k
-    recall = tp / max(y.sum(), 1)
-    f1 = np.where(precision + recall > 0, 2 * precision * recall / (precision + recall), 0)
-    return s[order], precision, recall, f1, int(y.sum()), len(s)
+    con.unregister("scored")
+    accounts = [(r[0], r[1]) for r in rows]
+    return accounts, np.array([r[2] for r in rows]), np.array([r[3] for r in rows], dtype=int)
 
 
-def at_threshold(sorted_scores, precision, recall, f1, threshold: float) -> dict:
-    idx = int(np.searchsorted(-sorted_scores, -threshold, side="right")) - 1
-    if idx < 0:
-        return {"threshold": threshold, "precision": 0.0, "recall": 0.0, "f1": 0.0}
-    return {
-        "threshold": round(float(threshold), 5),
-        "flagged": idx + 1,
-        "precision": round(float(precision[idx]), 4),
-        "recall": round(float(recall[idx]), 4),
-        "f1": round(float(f1[idx]), 4),
-    }
+def budgets(scores: np.ndarray, y: np.ndarray, name: str) -> list[dict]:
+    order = np.argsort(-scores, kind="stable")
+    return [
+        {
+            "scorer": name,
+            "alerts": k,
+            "true_cases": int(y[order[:k]].sum()),
+            "precision": round(float(y[order[:k]].mean()), 4),
+            "recall": round(float(y[order[:k]].sum() / y.sum()), 4),
+        }
+        for k in BUDGETS
+    ]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--budget", type=int, default=2000, help="alert threshold: top N accounts")
     parser.add_argument("--alerts", type=int, default=150, help="alerts sampled from the queue")
     parser.add_argument("--seed", type=int, default=20261014)
     args = parser.parse_args()
     started = time.perf_counter()
     con = connect()
-    build_currency_stats(con)
+    build_currency_stats(con, dm.TRAIN_PERIODS[0][0], dm.TRAIN_PERIODS[-1][1])
+    build_history(con)
     excluded = eval_set_accounts(con)
 
-    train_sets = [dm.labeled_features(con, s, e, excluded) for s, e in dm.TRAIN_PERIODS]
-    validation = dm.labeled_features(con, *dm.VALIDATION_PERIOD, excluded)
-    test = dm.labeled_features(con, *dm.TEST_PERIOD)
-    booster = dm.train(train_sets, validation)
+    train_set = concat(
+        [
+            dm.labeled_transactions(con, s, e, excluded, sample_negatives=dm.NEGATIVE_SAMPLE)
+            for s, e in dm.TRAIN_PERIODS
+        ]
+    )
+    validation = dm.labeled_transactions(con, *dm.VALIDATION_PERIOD, excluded)
+    test = dm.labeled_transactions(con, *dm.TEST_PERIOD)
+    print(f"features built in {time.perf_counter() - started:.0f} s", flush=True)
+
     model_dir = config.parquet_dir().parent / "detection"
     model_dir.mkdir(parents=True, exist_ok=True)
-    booster.save_model(model_dir / "model.json")
+    models, results = {}, []
+    for name, with_format in (("model", True), ("model_without_format", False)):
+        booster = dm.train(train_set, validation, with_format)
+        booster.save_model(model_dir / ("model.json" if with_format else "model-no-format.json"))
+        val_scores, test_scores = dm.predict(booster, validation), dm.predict(booster, test)
+        models[name] = (booster, val_scores, test_scores)
+        results.append(
+            {
+                **evaluate(name, val_scores, validation, test_scores, test),
+                "best_iteration": booster.best_iteration,
+            }
+        )
+        print(name, results[-1]["threshold_from_validation"], flush=True)
+    results.append(evaluate("rules", rules_score(validation), validation, rules_score(test), test))
 
-    val_scores = dm.predict(booster, validation)
-    test_scores = dm.predict(booster, test)
-    rule_index = (FEATURES.index("rule_score"), FEATURES.index("top_counterparty_score"))
-    rules_case = test.x[:, rule_index[0]] + test.x[:, rule_index[1]]
-
-    # Pattern laundering in the test period (a subgroup of positives).
-    pattern = set(
-        con.execute(
-            """
-            SELECT DISTINCT b, a FROM (
-                SELECT t.from_bank AS b, t.from_account AS a FROM transactions t
-                JOIN pattern_transactions USING (tx_id) WHERE t.ts BETWEEN ? AND ?
-                UNION ALL
-                SELECT t.to_bank, t.to_account FROM transactions t
-                JOIN pattern_transactions USING (tx_id) WHERE t.ts BETWEEN ? AND ?)
-            """,
-            [*dm.TEST_PERIOD, *dm.TEST_PERIOD],
-        ).fetchall()
-    )
-    is_pattern = np.array([1 if acc in pattern else 0 for acc in test.accounts])
-
-    budgets = []
-    for name, scores in (("model", test_scores), ("rules", rules_case)):
-        order = np.argsort(-scores, kind="stable")
-        for k in BUDGETS:
-            top = order[:k]
-            budgets.append(
-                {
-                    "scorer": name,
-                    "alerts": k,
-                    "true_cases": int(test.y[top].sum()),
-                    "precision": round(float(test.y[top].mean()), 4),
-                    "recall": round(float(test.y[top].sum() / test.y.sum()), 4),
-                    "recall_pattern": round(
-                        float(is_pattern[top].sum() / max(is_pattern.sum(), 1)), 4
-                    ),
-                }
-            )
-
-    # Transaction-level F1: threshold chosen on validation, applied once to test.
-    v = transaction_f1(con, validation, val_scores, *dm.VALIDATION_PERIOD)
-    best_val = int(np.argmax(v[3]))
-    chosen = float(v[0][best_val])
-    t = transaction_f1(con, test, test_scores, *dm.TEST_PERIOD)
-    tx_test = at_threshold(t[0], t[1], t[2], t[3], chosen)
-    tx_oracle = int(np.argmax(t[3]))
-
+    booster, val_scores, test_scores = models["model"]
+    threshold = dm.best_threshold(val_scores, validation.y)
+    accounts, acc_scores, acc_y = account_scores(con, test, test_scores)
+    rules_accounts, rules_acc, _ = account_scores(con, test, rules_score(test))
+    assert rules_accounts == accounts
     gain = booster.get_score(importance_type="gain")
-    importance = sorted(gain.items(), key=lambda kv: -kv[1])[:12]
+    importance = sorted(gain.items(), key=lambda kv: -kv[1])[:15]
 
-    # Alert queue: accounts above the threshold (top `budget`); a seeded sample of it
-    # becomes the investigation alert set, ordered by score.
-    queue = np.argsort(-test_scores, kind="stable")[: args.budget]
+    # Alert queue: every account with a transaction above the threshold.
+    flagged = test_scores >= threshold
+    queue = [int(i) for i in np.argsort(-acc_scores, kind="stable") if acc_scores[i] >= threshold]
     rng = np.random.default_rng(args.seed)
-    order = sorted(
-        rng.choice(queue, size=args.alerts, replace=False), key=lambda i: -test_scores[i]
+    sample = sorted(
+        (int(i) for i in rng.choice(queue, size=min(args.alerts, len(queue)), replace=False)),
+        key=lambda i: -acc_scores[i],
     )
-    rank_of = {int(i): r for r, i in enumerate(queue, start=1)}
-    factors = dm.top_factors(booster, test, list(order))
-    ALERTS.mkdir(parents=True, exist_ok=True)
-    start, end = dm.TEST_PERIOD
+    rank_of = {i: r for r, i in enumerate(queue, start=1)}
+    tx_rows: dict[tuple[int, str], list[int]] = {}
+    for j in np.flatnonzero(flagged):
+        tx_rows.setdefault(test.sender[j], []).append(int(j))
+        if test.receiver[j] != test.sender[j]:
+            tx_rows.setdefault(test.receiver[j], []).append(int(j))
+    triggers = {
+        i: sorted(tx_rows[accounts[i]], key=lambda j: -test_scores[j])[:MAX_TRIGGERS]
+        for i in sample
+    }
+    factors = dm.top_factors(booster, test, [triggers[i][0] for i in sample])
+
     alert_lines, truth_lines = [], []
-    for rank, (i, f) in enumerate(zip(order, factors, strict=True), start=1):
-        bank, acct = test.accounts[i]
-        alert_id = f"det-{rank:04d}"
-        queue_rank = rank_of[int(i)]
+    period_start, period_end = dm.TEST_PERIOD
+    for n, (i, f) in enumerate(zip(sample, factors, strict=True), start=1):
+        bank, acct = accounts[i]
+        rows = triggers[i]
+        times = [test.ts[j].astype("datetime64[m]").astype(datetime) for j in rows]
+        alert_id = f"det-{n:04d}"
         alert_lines.append(
             {
                 "alert_id": alert_id,
                 "seed_bank": bank,
                 "seed_account": acct,
-                "window_start": start.isoformat(),
-                "window_end": end.isoformat(),
-                "detection_score": round(float(test_scores[i]), 5),
-                "detection_rank": queue_rank,
+                "window_start": max(min(times) - WINDOW_PAD, period_start).isoformat(),
+                "window_end": min(max(times) + WINDOW_PAD, period_end).isoformat(),
+                "detection_score": round(float(acc_scores[i]), 5),
+                "detection_rank": rank_of[i],
+                "trigger_tx_ids": [int(test.tx_id[j]) for j in rows],
                 "detection_factors": f,
             }
         )
@@ -222,78 +253,68 @@ def main() -> None:
                    OR (t.to_bank = ? AND t.to_account = ?))
                 ORDER BY 1
                 """,
-                [start, end, bank, acct, bank, acct],
+                [period_start, period_end, bank, acct, bank, acct],
             ).fetchall()
         ]
         truth_lines.append(
             {
                 "alert_id": alert_id,
-                "label": "positive" if test.y[i] else "benign",
+                "label": "positive" if acc_y[i] else "benign",
+                "true_triggers": int(sum(test.y[j] for j in rows)),
                 "pattern_blocks": blocks,
-                "other_laundering_only": bool(test.y[i]) and not blocks,
+                "other_laundering_only": bool(acc_y[i]) and not blocks,
             }
         )
-    (ALERTS / "alerts.jsonl").write_text(
-        "".join(json.dumps(x) + "\n" for x in alert_lines), encoding="utf-8"
-    )
-    (ALERTS / "ground_truth.jsonl").write_text(
-        "".join(json.dumps(x) + "\n" for x in truth_lines), encoding="utf-8"
-    )
+    ALERTS.mkdir(parents=True, exist_ok=True)
+    for name, lines in (("alerts.jsonl", alert_lines), ("ground_truth.jsonl", truth_lines)):
+        (ALERTS / name).write_text(
+            "".join(json.dumps(x) + "\n" for x in lines), encoding="utf-8", newline="\n"
+        )
 
+    after = test.ts > np.datetime64(dm.PRIMARY_END)
     result = {
         "created_utc": datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
-        "model": "XGBoost on account features (aml_agent/detection)",
+        "model": "XGBoost transaction monitoring (aml_agent/detection)",
+        "split": "IBM AMLworld 60/20/20 by time",
         "params": dm.PARAMS,
-        "best_iteration": booster.best_iteration,
-        "features": list(FEATURES),
+        "negative_sample_in_training": dm.NEGATIVE_SAMPLE,
+        "features": list(dm.ALL_FEATURES),
         "periods": {
             "train": [[s.isoformat(), e.isoformat()] for s, e in dm.TRAIN_PERIODS],
             "validation": [p.isoformat() for p in dm.VALIDATION_PERIOD],
             "test": [p.isoformat() for p in dm.TEST_PERIOD],
         },
         "rows": {
-            "train": int(sum(len(d.y) for d in train_sets)),
-            "train_positive": int(sum(d.y.sum() for d in train_sets)),
-            "test": len(test.y),
-            "test_positive": int(test.y.sum()),
-            "test_pattern_positive": int(is_pattern.sum()),
+            "train_sampled": len(train_set),
+            "train_laundering": int(train_set.y.sum()),
+            "validation": len(validation),
+            "validation_laundering": int(validation.y.sum()),
+            "test": len(test),
+            "test_laundering": int(test.y.sum()),
+            "test_after_sep_10": int(after.sum()),
+            "test_laundering_after_sep_10": int(test.y[after].sum()),
         },
+        "transaction_level_test": results,
         "account_level_test": {
-            "base_rate": round(float(test.y.mean()), 5),
-            "average_precision_model": round(dm.average_precision(test_scores, test.y), 4),
-            "average_precision_rules": round(dm.average_precision(rules_case, test.y), 4),
-            "validation_average_precision_model": round(
-                dm.average_precision(val_scores, validation.y), 4
-            ),
-            "alert_budgets": budgets,
-        },
-        "transaction_level_test": {
-            "laundering_transactions": t[4],
-            "transactions": t[5],
-            "threshold_from_validation": tx_test,
-            "best_on_test_optimistic": {
-                "precision": round(float(t[1][tx_oracle]), 4),
-                "recall": round(float(t[2][tx_oracle]), 4),
-                "f1": round(float(t[3][tx_oracle]), 4),
-            },
+            "accounts": len(accounts),
+            "laundering_accounts": int(acc_y.sum()),
+            "alerted_at_threshold": len(queue),
+            "alerted_laundering": int(sum(acc_y[i] for i in queue)),
+            "alert_budgets": budgets(acc_scores, acc_y, "model")
+            + budgets(rules_acc, acc_y, "rules"),
         },
         "top_features_by_gain": [[k, round(v, 2)] for k, v in importance],
-        "alert_queue": {"budget": args.budget, "sample": args.alerts, "seed": args.seed},
-        "alerts_written": len(alert_lines),
+        "alert_queue": {"sample": len(sample), "seed": args.seed},
         "alerts_true": int(sum(1 for x in truth_lines if x["label"] == "positive")),
         "seconds": round(time.perf_counter() - started, 1),
     }
     RUNS.mkdir(parents=True, exist_ok=True)
     out = RUNS / f"model-{result['created_utc']}.json"
-    out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    print(
-        json.dumps(
-            {k: result[k] for k in ("rows", "account_level_test", "transaction_level_test")},
-            indent=1,
-        )
-    )
-    print("alerts:", result["alerts_written"], "true:", result["alerts_true"])
-    print("top features:", result["top_features_by_gain"][:8])
+    out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n")
+    print(json.dumps({k: result[k] for k in ("rows", "transaction_level_test")}, indent=1))
+    print(json.dumps(result["account_level_test"], indent=1))
+    print("alerts:", len(alert_lines), "true:", result["alerts_true"])
+    print("top features:", result["top_features_by_gain"][:10])
     print(f"done in {result['seconds']} s; written {out}")
 
 

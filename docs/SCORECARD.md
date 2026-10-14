@@ -36,29 +36,29 @@ Transaction level, test period Sep 8 16:12 to Sep 10 (989,187 transactions, 1,07
 
 **Limits.** Weights and thresholds were chosen on a balanced design sample, not for natural prevalence. Some signals (currency conversion, new counterparties) are especially clean in this simulator.
 
-**Results (2026-10-14, detection model, `docs/decisions/0012-detection-model.md`)**
+**Results (2026-10-14, transaction monitoring model, `docs/decisions/0013-transaction-monitoring.md`)**
 
-An open-source XGBoost model on 31 account features (the rule signals plus network shape, per-currency amount scores, timing and counterparty features). Chronological split of the primary period: trained on Sep 2 to Sep 6 13:35, validation (early stopping and threshold only) to Sep 8 16:11, test once on Sep 8 16:12 to Sep 10. Frozen evaluation-set accounts are removed from training and validation. Run: `python scripts/train_detection.py` (about 2 minutes, no language model). Results: `evals/runs/detection/model-20261014T214623Z.json`.
+An open-source XGBoost model scores every transaction from the payment itself (amount for its currency, currency change, payment format, timing, earlier dealings between the two accounts) and from the sender's and receiver's account features for the review period. Split: IBM's benchmark split, 60/20/20 of all transactions by time (train Sep 1 to Sep 6 13:35, validation to Sep 8 16:11, test to Sep 18, including the rows after Sep 10). The alert threshold is chosen on validation and applied once to test. Run: `python scripts/train_detection.py` (about 7 minutes, no language model). Results: `evals/runs/detection/model-20261014T221718Z.json`.
 
-Test period: 356,183 accounts, 1,671 positive (base rate 0.47%). PR-AUC: model 0.274, rules 0.083 (validation 0.314).
+Test period: 1,015,882 transactions, 1,798 laundering (0.18%); 1,108 rows fall after Sep 10, and 655 of them are laundering.
 
-| Alerts (top N) | Model precision | Model recall | Rules precision | Rules recall |
-|---|---|---|---|---|
-| 100 | 99.0% | 5.9% | 66.0% | 4.0% |
-| 250 | 86.8% | 13.0% | 39.2% | 5.9% |
-| 500 | 62.6% | 18.7% | 21.6% | 6.5% |
-| 1,000 | 40.1% | 24.0% | 14.9% | 8.9% |
-| 2,000 | 25.6% | 30.6% | 10.9% | 13.1% |
+| Scorer | PR-AUC | Precision | Recall | F1 | F1 without rows after Sep 10 |
+|---|---|---|---|---|---|
+| Model, with payment format | 0.709 | 84.4% | 61.5% | **71.2%** | 58.9% |
+| Model, without payment format | 0.625 | 77.1% | 54.9% | 64.1% | 50.6% |
+| Red-flag rules | 0.060 | 7.4% | 20.5% | 10.9% | 6.5% |
 
-Transaction level (a transaction is flagged when both of its accounts score above a threshold chosen on validation; 993,724 transactions, 1,141 laundering): F1 24.8% (precision 35.8%, recall 18.9%). Best F1 on the test period itself: 25.4% (optimistic). Rules: 11.3% (optimistic).
+The paper's models on the same split and metric (minority-class F1, HI-Small; Altman et al., NeurIPS 2023, Table 2): GIN 28.7% to XGBoost with graph features 63.2%.
+
+Accounts (an account is alerted when any of its test transactions passes the threshold): 1,516 accounts alerted, 1,223 of them laundering (81%), out of 2,201 laundering accounts (56% caught). By alert volume, the model's top 1,000 accounts are 96% laundering against 28% for the rules.
 
 **Reading.**
-- At the same alert volume the model finds two to four times as much laundering as the rules. At 1,000 alerts, 4 in 10 are true against 1.5 in 10 for the rules.
-- Transaction F1 of 24.8% is close to the paper's lowest trained baseline (GIN, 28.7%) and well below its best (63.2%). Our model scores accounts, not transactions, never sees payment format, and stops at Sep 10, so the comparison is rough.
-- Most laundering is still missed: at 2,000 alerts recall is 31% (48% for pattern laundering).
-- The investigation alert queue (`evals/alerts/detection/`) is a seeded sample of 150 accounts from the top 2,000, so about a quarter are real (33 of 150), like a real queue, not only the easiest cases.
+- On IBM's split and metric the model scores above the paper's best reported model, with or without payment format. The threshold chosen on validation is almost the best possible on test (71.15% against a best of 71.22%), so the result is not tuned on the test set.
+- Two simulator effects lift it, and both are visible in the table: payment format (ACH is 11.8% of transactions but 85% of laundering) adds about 7 points, and the rows after Sep 10 (59% laundering) add about 12. A real bank has neither, so the realistic figure here is closer to 50%.
+- Every alert's strongest reason is "payment by ACH". The alerts are explained, but the explanation shows the model learned the simulator's habit.
+- Account features describe the whole review period, so a payment is scored after the period ends (batch monitoring), not the moment it is made. IBM's exact feature timing may differ.
 
-**Limits.** One training run and one test period; no spread across seeds yet. Simulator signals such as currency conversion dominate the model (top features by gain: currency switch, new-counterparty share, currencies paid, rule score).
+**Limits.** One training run and seed. The first version of this model scored accounts, not transactions, on the primary period only and without payment format: account PR-AUC 0.274 and transaction F1 24.8% (`evals/runs/detection/model-20261014T214623Z.json`, decision 0012, superseded).
 
 ## B. Investigation: given an alert, does the system get the facts right?
 

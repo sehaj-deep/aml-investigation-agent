@@ -28,8 +28,8 @@ services:
       PARQUET_DIR: /data/parquet
       MCP_HOST: 0.0.0.0
       MCP_PORT: "8001"
-      TOOLS_SHOW_PAYMENT_FORMAT: ${TOOLS_SHOW_PAYMENT_FORMAT:-false}
-      TOOLS_SHOW_LATE_ROWS: ${TOOLS_SHOW_LATE_ROWS:-false}
+      TOOLS_SHOW_PAYMENT_FORMAT: ${TOOLS_SHOW_PAYMENT_FORMAT:-true}
+      TOOLS_SHOW_LATE_ROWS: ${TOOLS_SHOW_LATE_ROWS:-true}
     volumes:
       - ./data/parquet:/data/parquet:ro
     healthcheck:

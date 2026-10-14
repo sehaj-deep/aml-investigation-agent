@@ -1,150 +1,150 @@
-{"alert_id": "det-0001", "label": "positive", "pattern_blocks": [274], "other_laundering_only": false}
-{"alert_id": "det-0002", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0003", "label": "positive", "pattern_blocks": [319], "other_laundering_only": false}
-{"alert_id": "det-0004", "label": "positive", "pattern_blocks": [211], "other_laundering_only": false}
-{"alert_id": "det-0005", "label": "positive", "pattern_blocks": [325], "other_laundering_only": false}
-{"alert_id": "det-0006", "label": "positive", "pattern_blocks": [316], "other_laundering_only": false}
-{"alert_id": "det-0007", "label": "positive", "pattern_blocks": [323], "other_laundering_only": false}
-{"alert_id": "det-0008", "label": "positive", "pattern_blocks": [236], "other_laundering_only": false}
-{"alert_id": "det-0009", "label": "positive", "pattern_blocks": [263, 267, 268, 311, 322, 326, 351, 364], "other_laundering_only": false}
-{"alert_id": "det-0010", "label": "positive", "pattern_blocks": [253], "other_laundering_only": false}
-{"alert_id": "det-0011", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0012", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0013", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0014", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0015", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0016", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0017", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0018", "label": "positive", "pattern_blocks": [274], "other_laundering_only": false}
-{"alert_id": "det-0019", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0020", "label": "positive", "pattern_blocks": [266], "other_laundering_only": false}
-{"alert_id": "det-0021", "label": "positive", "pattern_blocks": [170], "other_laundering_only": false}
-{"alert_id": "det-0022", "label": "positive", "pattern_blocks": [31], "other_laundering_only": false}
-{"alert_id": "det-0023", "label": "positive", "pattern_blocks": [365], "other_laundering_only": false}
-{"alert_id": "det-0024", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0025", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0026", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0027", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0028", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0029", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0030", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0031", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0032", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0033", "label": "positive", "pattern_blocks": [94], "other_laundering_only": false}
-{"alert_id": "det-0034", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0035", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0036", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0037", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0038", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0039", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0040", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0041", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0042", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0043", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0044", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0045", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0046", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0047", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0048", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0049", "label": "positive", "pattern_blocks": [350], "other_laundering_only": false}
-{"alert_id": "det-0050", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0051", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0052", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0053", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0054", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0055", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0056", "label": "positive", "pattern_blocks": [290], "other_laundering_only": false}
-{"alert_id": "det-0057", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0058", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0059", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0060", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0061", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0062", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0063", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0064", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0065", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0066", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0067", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0068", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0069", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0070", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0071", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0072", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0073", "label": "positive", "pattern_blocks": [245], "other_laundering_only": false}
-{"alert_id": "det-0074", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0075", "label": "positive", "pattern_blocks": [176], "other_laundering_only": false}
-{"alert_id": "det-0076", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0077", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0078", "label": "positive", "pattern_blocks": [208], "other_laundering_only": false}
-{"alert_id": "det-0079", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0080", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0081", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0082", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0083", "label": "positive", "pattern_blocks": [231], "other_laundering_only": false}
-{"alert_id": "det-0084", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0085", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0086", "label": "positive", "pattern_blocks": [211], "other_laundering_only": false}
-{"alert_id": "det-0087", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0088", "label": "positive", "pattern_blocks": [284], "other_laundering_only": false}
-{"alert_id": "det-0089", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0090", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0091", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0092", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0093", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0094", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0095", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0096", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0097", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0098", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0099", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0100", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0101", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0102", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0103", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0104", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0105", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0106", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0107", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0108", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0109", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0110", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0111", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0112", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0113", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0114", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0115", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0116", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0117", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0118", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0119", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0120", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0121", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0122", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0123", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0124", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0125", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0126", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0127", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0128", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0129", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0130", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0131", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0132", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0133", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0134", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0135", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0136", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0137", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0138", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0139", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0140", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0141", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0142", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0143", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0144", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0145", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0146", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0147", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0148", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
-{"alert_id": "det-0149", "label": "positive", "pattern_blocks": [], "other_laundering_only": true}
-{"alert_id": "det-0150", "label": "benign", "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0001", "label": "positive", "true_triggers": 1, "pattern_blocks": [360], "other_laundering_only": false}
+{"alert_id": "det-0002", "label": "positive", "true_triggers": 1, "pattern_blocks": [148], "other_laundering_only": false}
+{"alert_id": "det-0003", "label": "positive", "true_triggers": 1, "pattern_blocks": [92], "other_laundering_only": false}
+{"alert_id": "det-0004", "label": "positive", "true_triggers": 1, "pattern_blocks": [306], "other_laundering_only": false}
+{"alert_id": "det-0005", "label": "positive", "true_triggers": 25, "pattern_blocks": [306], "other_laundering_only": false}
+{"alert_id": "det-0006", "label": "positive", "true_triggers": 2, "pattern_blocks": [266], "other_laundering_only": false}
+{"alert_id": "det-0007", "label": "positive", "true_triggers": 1, "pattern_blocks": [253], "other_laundering_only": false}
+{"alert_id": "det-0008", "label": "positive", "true_triggers": 3, "pattern_blocks": [80], "other_laundering_only": false}
+{"alert_id": "det-0009", "label": "positive", "true_triggers": 2, "pattern_blocks": [269], "other_laundering_only": false}
+{"alert_id": "det-0010", "label": "positive", "true_triggers": 1, "pattern_blocks": [316], "other_laundering_only": false}
+{"alert_id": "det-0011", "label": "positive", "true_triggers": 1, "pattern_blocks": [231], "other_laundering_only": false}
+{"alert_id": "det-0012", "label": "positive", "true_triggers": 1, "pattern_blocks": [307], "other_laundering_only": false}
+{"alert_id": "det-0013", "label": "positive", "true_triggers": 9, "pattern_blocks": [354], "other_laundering_only": false}
+{"alert_id": "det-0014", "label": "positive", "true_triggers": 1, "pattern_blocks": [368], "other_laundering_only": false}
+{"alert_id": "det-0015", "label": "positive", "true_triggers": 1, "pattern_blocks": [360], "other_laundering_only": false}
+{"alert_id": "det-0016", "label": "positive", "true_triggers": 1, "pattern_blocks": [252], "other_laundering_only": false}
+{"alert_id": "det-0017", "label": "positive", "true_triggers": 1, "pattern_blocks": [256], "other_laundering_only": false}
+{"alert_id": "det-0018", "label": "positive", "true_triggers": 13, "pattern_blocks": [288], "other_laundering_only": false}
+{"alert_id": "det-0019", "label": "positive", "true_triggers": 2, "pattern_blocks": [288], "other_laundering_only": false}
+{"alert_id": "det-0020", "label": "positive", "true_triggers": 1, "pattern_blocks": [304], "other_laundering_only": false}
+{"alert_id": "det-0021", "label": "positive", "true_triggers": 2, "pattern_blocks": [365], "other_laundering_only": false}
+{"alert_id": "det-0022", "label": "positive", "true_triggers": 2, "pattern_blocks": [290], "other_laundering_only": false}
+{"alert_id": "det-0023", "label": "positive", "true_triggers": 1, "pattern_blocks": [307], "other_laundering_only": false}
+{"alert_id": "det-0024", "label": "positive", "true_triggers": 1, "pattern_blocks": [345], "other_laundering_only": false}
+{"alert_id": "det-0025", "label": "positive", "true_triggers": 1, "pattern_blocks": [281], "other_laundering_only": false}
+{"alert_id": "det-0026", "label": "positive", "true_triggers": 1, "pattern_blocks": [323], "other_laundering_only": false}
+{"alert_id": "det-0027", "label": "positive", "true_triggers": 16, "pattern_blocks": [325], "other_laundering_only": false}
+{"alert_id": "det-0028", "label": "positive", "true_triggers": 1, "pattern_blocks": [273], "other_laundering_only": false}
+{"alert_id": "det-0029", "label": "positive", "true_triggers": 1, "pattern_blocks": [368], "other_laundering_only": false}
+{"alert_id": "det-0030", "label": "positive", "true_triggers": 1, "pattern_blocks": [196], "other_laundering_only": false}
+{"alert_id": "det-0031", "label": "positive", "true_triggers": 1, "pattern_blocks": [273], "other_laundering_only": false}
+{"alert_id": "det-0032", "label": "positive", "true_triggers": 2, "pattern_blocks": [361], "other_laundering_only": false}
+{"alert_id": "det-0033", "label": "positive", "true_triggers": 1, "pattern_blocks": [346], "other_laundering_only": false}
+{"alert_id": "det-0034", "label": "positive", "true_triggers": 1, "pattern_blocks": [181], "other_laundering_only": false}
+{"alert_id": "det-0035", "label": "positive", "true_triggers": 1, "pattern_blocks": [256], "other_laundering_only": false}
+{"alert_id": "det-0036", "label": "positive", "true_triggers": 1, "pattern_blocks": [273], "other_laundering_only": false}
+{"alert_id": "det-0037", "label": "positive", "true_triggers": 1, "pattern_blocks": [242], "other_laundering_only": false}
+{"alert_id": "det-0038", "label": "positive", "true_triggers": 2, "pattern_blocks": [199], "other_laundering_only": false}
+{"alert_id": "det-0039", "label": "positive", "true_triggers": 1, "pattern_blocks": [148], "other_laundering_only": false}
+{"alert_id": "det-0040", "label": "positive", "true_triggers": 9, "pattern_blocks": [216, 342, 345], "other_laundering_only": false}
+{"alert_id": "det-0041", "label": "positive", "true_triggers": 1, "pattern_blocks": [321], "other_laundering_only": false}
+{"alert_id": "det-0042", "label": "positive", "true_triggers": 1, "pattern_blocks": [306], "other_laundering_only": false}
+{"alert_id": "det-0043", "label": "positive", "true_triggers": 1, "pattern_blocks": [215], "other_laundering_only": false}
+{"alert_id": "det-0044", "label": "positive", "true_triggers": 1, "pattern_blocks": [304], "other_laundering_only": false}
+{"alert_id": "det-0045", "label": "positive", "true_triggers": 1, "pattern_blocks": [242], "other_laundering_only": false}
+{"alert_id": "det-0046", "label": "positive", "true_triggers": 1, "pattern_blocks": [300], "other_laundering_only": false}
+{"alert_id": "det-0047", "label": "positive", "true_triggers": 1, "pattern_blocks": [290], "other_laundering_only": false}
+{"alert_id": "det-0048", "label": "positive", "true_triggers": 1, "pattern_blocks": [286], "other_laundering_only": false}
+{"alert_id": "det-0049", "label": "positive", "true_triggers": 1, "pattern_blocks": [226], "other_laundering_only": false}
+{"alert_id": "det-0050", "label": "positive", "true_triggers": 1, "pattern_blocks": [354], "other_laundering_only": false}
+{"alert_id": "det-0051", "label": "positive", "true_triggers": 1, "pattern_blocks": [300], "other_laundering_only": false}
+{"alert_id": "det-0052", "label": "positive", "true_triggers": 1, "pattern_blocks": [306], "other_laundering_only": false}
+{"alert_id": "det-0053", "label": "positive", "true_triggers": 1, "pattern_blocks": [244], "other_laundering_only": false}
+{"alert_id": "det-0054", "label": "positive", "true_triggers": 1, "pattern_blocks": [228], "other_laundering_only": false}
+{"alert_id": "det-0055", "label": "positive", "true_triggers": 1, "pattern_blocks": [284], "other_laundering_only": false}
+{"alert_id": "det-0056", "label": "positive", "true_triggers": 1, "pattern_blocks": [228], "other_laundering_only": false}
+{"alert_id": "det-0057", "label": "positive", "true_triggers": 1, "pattern_blocks": [219], "other_laundering_only": false}
+{"alert_id": "det-0058", "label": "positive", "true_triggers": 1, "pattern_blocks": [254, 342, 345], "other_laundering_only": false}
+{"alert_id": "det-0059", "label": "positive", "true_triggers": 2, "pattern_blocks": [341], "other_laundering_only": false}
+{"alert_id": "det-0060", "label": "positive", "true_triggers": 2, "pattern_blocks": [341], "other_laundering_only": false}
+{"alert_id": "det-0061", "label": "positive", "true_triggers": 1, "pattern_blocks": [325], "other_laundering_only": false}
+{"alert_id": "det-0062", "label": "positive", "true_triggers": 5, "pattern_blocks": [296, 342, 345], "other_laundering_only": false}
+{"alert_id": "det-0063", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0064", "label": "positive", "true_triggers": 1, "pattern_blocks": [331], "other_laundering_only": false}
+{"alert_id": "det-0065", "label": "positive", "true_triggers": 1, "pattern_blocks": [258], "other_laundering_only": false}
+{"alert_id": "det-0066", "label": "positive", "true_triggers": 2, "pattern_blocks": [341], "other_laundering_only": false}
+{"alert_id": "det-0067", "label": "positive", "true_triggers": 1, "pattern_blocks": [252], "other_laundering_only": false}
+{"alert_id": "det-0068", "label": "positive", "true_triggers": 1, "pattern_blocks": [354], "other_laundering_only": false}
+{"alert_id": "det-0069", "label": "positive", "true_triggers": 1, "pattern_blocks": [341], "other_laundering_only": false}
+{"alert_id": "det-0070", "label": "positive", "true_triggers": 1, "pattern_blocks": [306], "other_laundering_only": false}
+{"alert_id": "det-0071", "label": "positive", "true_triggers": 1, "pattern_blocks": [308], "other_laundering_only": false}
+{"alert_id": "det-0072", "label": "positive", "true_triggers": 1, "pattern_blocks": [264], "other_laundering_only": false}
+{"alert_id": "det-0073", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0074", "label": "positive", "true_triggers": 5, "pattern_blocks": [255], "other_laundering_only": false}
+{"alert_id": "det-0075", "label": "positive", "true_triggers": 1, "pattern_blocks": [187], "other_laundering_only": false}
+{"alert_id": "det-0076", "label": "positive", "true_triggers": 1, "pattern_blocks": [227], "other_laundering_only": false}
+{"alert_id": "det-0077", "label": "positive", "true_triggers": 1, "pattern_blocks": [300], "other_laundering_only": false}
+{"alert_id": "det-0078", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0079", "label": "positive", "true_triggers": 1, "pattern_blocks": [368], "other_laundering_only": false}
+{"alert_id": "det-0080", "label": "positive", "true_triggers": 1, "pattern_blocks": [274], "other_laundering_only": false}
+{"alert_id": "det-0081", "label": "positive", "true_triggers": 2, "pattern_blocks": [282], "other_laundering_only": false}
+{"alert_id": "det-0082", "label": "positive", "true_triggers": 2, "pattern_blocks": [350], "other_laundering_only": false}
+{"alert_id": "det-0083", "label": "positive", "true_triggers": 1, "pattern_blocks": [309], "other_laundering_only": false}
+{"alert_id": "det-0084", "label": "positive", "true_triggers": 1, "pattern_blocks": [354], "other_laundering_only": false}
+{"alert_id": "det-0085", "label": "positive", "true_triggers": 1, "pattern_blocks": [353], "other_laundering_only": false}
+{"alert_id": "det-0086", "label": "positive", "true_triggers": 1, "pattern_blocks": [353], "other_laundering_only": false}
+{"alert_id": "det-0087", "label": "positive", "true_triggers": 1, "pattern_blocks": [300], "other_laundering_only": false}
+{"alert_id": "det-0088", "label": "positive", "true_triggers": 1, "pattern_blocks": [47], "other_laundering_only": false}
+{"alert_id": "det-0089", "label": "positive", "true_triggers": 1, "pattern_blocks": [325], "other_laundering_only": false}
+{"alert_id": "det-0090", "label": "positive", "true_triggers": 1, "pattern_blocks": [348], "other_laundering_only": false}
+{"alert_id": "det-0091", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0092", "label": "positive", "true_triggers": 1, "pattern_blocks": [285], "other_laundering_only": false}
+{"alert_id": "det-0093", "label": "positive", "true_triggers": 1, "pattern_blocks": [116], "other_laundering_only": false}
+{"alert_id": "det-0094", "label": "positive", "true_triggers": 1, "pattern_blocks": [262], "other_laundering_only": false}
+{"alert_id": "det-0095", "label": "positive", "true_triggers": 1, "pattern_blocks": [262], "other_laundering_only": false}
+{"alert_id": "det-0096", "label": "positive", "true_triggers": 1, "pattern_blocks": [285], "other_laundering_only": false}
+{"alert_id": "det-0097", "label": "positive", "true_triggers": 1, "pattern_blocks": [306], "other_laundering_only": false}
+{"alert_id": "det-0098", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0099", "label": "positive", "true_triggers": 1, "pattern_blocks": [360], "other_laundering_only": false}
+{"alert_id": "det-0100", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0101", "label": "positive", "true_triggers": 1, "pattern_blocks": [47], "other_laundering_only": false}
+{"alert_id": "det-0102", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0103", "label": "positive", "true_triggers": 1, "pattern_blocks": [285], "other_laundering_only": false}
+{"alert_id": "det-0104", "label": "positive", "true_triggers": 1, "pattern_blocks": [325], "other_laundering_only": false}
+{"alert_id": "det-0105", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0106", "label": "positive", "true_triggers": 1, "pattern_blocks": [306], "other_laundering_only": false}
+{"alert_id": "det-0107", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0108", "label": "positive", "true_triggers": 2, "pattern_blocks": [231], "other_laundering_only": false}
+{"alert_id": "det-0109", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0110", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0111", "label": "positive", "true_triggers": 1, "pattern_blocks": [285], "other_laundering_only": false}
+{"alert_id": "det-0112", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0113", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0114", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0115", "label": "positive", "true_triggers": 1, "pattern_blocks": [302], "other_laundering_only": false}
+{"alert_id": "det-0116", "label": "positive", "true_triggers": 1, "pattern_blocks": [231], "other_laundering_only": false}
+{"alert_id": "det-0117", "label": "positive", "true_triggers": 1, "pattern_blocks": [266], "other_laundering_only": false}
+{"alert_id": "det-0118", "label": "positive", "true_triggers": 1, "pattern_blocks": [284], "other_laundering_only": false}
+{"alert_id": "det-0119", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0120", "label": "positive", "true_triggers": 1, "pattern_blocks": [255], "other_laundering_only": false}
+{"alert_id": "det-0121", "label": "positive", "true_triggers": 1, "pattern_blocks": [234, 260], "other_laundering_only": false}
+{"alert_id": "det-0122", "label": "positive", "true_triggers": 1, "pattern_blocks": [308], "other_laundering_only": false}
+{"alert_id": "det-0123", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0124", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0125", "label": "positive", "true_triggers": 1, "pattern_blocks": [256], "other_laundering_only": false}
+{"alert_id": "det-0126", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0127", "label": "positive", "true_triggers": 1, "pattern_blocks": [270], "other_laundering_only": false}
+{"alert_id": "det-0128", "label": "positive", "true_triggers": 1, "pattern_blocks": [360], "other_laundering_only": false}
+{"alert_id": "det-0129", "label": "positive", "true_triggers": 5, "pattern_blocks": [254, 345], "other_laundering_only": false}
+{"alert_id": "det-0130", "label": "positive", "true_triggers": 1, "pattern_blocks": [357], "other_laundering_only": false}
+{"alert_id": "det-0131", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0132", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0133", "label": "positive", "true_triggers": 1, "pattern_blocks": [348], "other_laundering_only": false}
+{"alert_id": "det-0134", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0135", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0136", "label": "positive", "true_triggers": 2, "pattern_blocks": [293, 317], "other_laundering_only": false}
+{"alert_id": "det-0137", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0138", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0139", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0140", "label": "positive", "true_triggers": 2, "pattern_blocks": [262], "other_laundering_only": false}
+{"alert_id": "det-0141", "label": "positive", "true_triggers": 1, "pattern_blocks": [226], "other_laundering_only": false}
+{"alert_id": "det-0142", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0143", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0144", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0145", "label": "positive", "true_triggers": 1, "pattern_blocks": [317], "other_laundering_only": false}
+{"alert_id": "det-0146", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0147", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0148", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}
+{"alert_id": "det-0149", "label": "positive", "true_triggers": 1, "pattern_blocks": [191], "other_laundering_only": false}
+{"alert_id": "det-0150", "label": "benign", "true_triggers": 0, "pattern_blocks": [], "other_laundering_only": false}

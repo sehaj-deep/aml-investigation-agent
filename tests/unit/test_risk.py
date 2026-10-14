@@ -78,6 +78,8 @@ def test_behavior_tool_on_synthetic_seed(tools):
     assert out["rules"] == ["R2", "R3", "R4", "R5"] and out["score"] == 4
 
 
-def test_behavior_tool_hides_late_rows(tools):
+def test_behavior_tool_late_rows_switch(tools, monkeypatch):
+    assert tools.get_account_behavior(bank_id=3, account="LATE0001")["signals"]["n_transfers"] == 1
+    monkeypatch.setenv("TOOLS_SHOW_LATE_ROWS", "false")
     out = tools.get_account_behavior(bank_id=3, account="LATE0001")
     assert out["signals"]["n_transfers"] == 0 and out["rules"] == []

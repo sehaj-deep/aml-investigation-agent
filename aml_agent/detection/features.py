@@ -1,10 +1,9 @@
 """Account features for a review period, computed for every account in one pass.
 
 Builds on the risk-rule signals (aml_agent/analysis/population.py) and adds graph,
-amount, timing and counterparty features. Rules of the project still hold: non-self
-transfers only, the primary period only, payment format never used, and amounts are
-never added across currencies (amounts enter only as per-currency standard scores of
-their logarithm).
+amount, timing and counterparty features, from non-self transfers. Nothing looks past
+the end of the period. Amounts are never added across currencies (they enter only as
+per-currency standard scores of their logarithm). Labels are never read.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from datetime import datetime
 
 import duckdb
 
-from aml_agent.analysis.population import DATA_START, PRIMARY_END, score_population
+from aml_agent.analysis.population import score_population
 
 FEATURES: tuple[str, ...] = (
     # risk-rule signals
@@ -55,8 +54,8 @@ FEATURES: tuple[str, ...] = (
 )
 
 
-def build_currency_stats(con: duckdb.DuckDBPyConnection) -> None:
-    """Mean and spread of log amounts per currency over the primary period (no labels)."""
+def build_currency_stats(con: duckdb.DuckDBPyConnection, start: datetime, end: datetime) -> None:
+    """Mean and spread of log amounts per currency over [start, end] (training data only)."""
     con.execute(
         """
         CREATE OR REPLACE TEMP TABLE currency_stats AS
@@ -68,7 +67,7 @@ def build_currency_stats(con: duckdb.DuckDBPyConnection) -> None:
             WHERE NOT is_self_transfer AND ts BETWEEN $p0 AND $pe AND amount_received > 0)
         GROUP BY currency
         """,
-        {"p0": DATA_START, "pe": PRIMARY_END},
+        {"p0": start, "pe": end},
     )
 
 
@@ -77,7 +76,7 @@ def build_features(con: duckdb.DuckDBPyConnection, start: datetime, end: datetim
 
     Needs `currency_stats` (build_currency_stats) and a `transactions` relation.
     """
-    score_population(con, start, end)
+    score_population(con, start, end, history_end=end)
     con.execute(
         """
         CREATE OR REPLACE TEMP TABLE legs_amount AS

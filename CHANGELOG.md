@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased: detection model
-- Open-source XGBoost detection model on 31 account features, chronological split; test PR-AUC 0.274 against 0.083 for the rules; transaction F1 24.8%.
-- Explained alert queue (top three factors per alert) sampled from the top 2,000 accounts, for the investigation evaluation.
-- Decision record 0012; scorecard part A updated.
+## Unreleased: transaction monitoring
+- Open-source XGBoost transaction monitoring model on IBM's 60/20/20 time split: test F1 71.2% with payment format, 64.1% without (paper: 28.7% to 63.2%); rules 10.9%. Figures without the rows after Sep 10 reported alongside.
+- Alerts are accounts with suspicious transactions, each with its triggering transactions and top three SHAP factors; a seeded sample of 150 is the queue for the investigation evaluation.
+- Tools show payment format and every date by default, as an analyst sees them.
+- Decision records 0012 (first, account-level version) and 0013; scorecard part A updated.
 
 ## Unreleased: Sprint 2 (audit and faithfulness), pending owner review and a live model
 - Append-only, hash-chained audit log of every model call, tool call, state change and decision; UPDATE, DELETE and TRUNCATE blocked; a case rebuilt from the log alone matches the live run exactly.

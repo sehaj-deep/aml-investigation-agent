@@ -1,6 +1,6 @@
 # 0012 Open-source detection model (roadmap phase H)
 
-Status: accepted (2026-10-14)
+Status: superseded by 0013 (2026-10-14)
 
 ## Why
 

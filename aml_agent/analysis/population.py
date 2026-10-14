@@ -9,7 +9,7 @@ checks that both give identical signals.
 Definitions match `GraphTools.get_account_behavior` and `analysis/risk.py`:
 non-self transfers only; the review period is [start, end]; "before" means from the
 start of the data to the start of the period; activity share is relative to the whole
-primary period. The case score adds the highest score among up to 8 first-time
+data the tools show. The case score adds the highest score among up to 8 first-time
 counterparties (pairs with at most 2 transfers in the period), ordered by transfer
 count, bank and account. (The case file takes those from the subject's top 100
 counterparties, which only differs for accounts with more than 100.)
@@ -22,15 +22,24 @@ from datetime import datetime
 import duckdb
 
 from aml_agent.analysis import risk
+from aml_agent.tools.graph import data_end
 
 DATA_START = datetime(2022, 9, 1)
 PRIMARY_END = datetime(2022, 9, 10, 23, 59)
 
 
-def score_population(con: duckdb.DuckDBPyConnection, start: datetime, end: datetime) -> None:
+def score_population(
+    con: duckdb.DuckDBPyConnection,
+    start: datetime,
+    end: datetime,
+    history_end: datetime | None = None,
+) -> None:
     """Create the temp table `account_risk` for the review period [start, end].
 
-    `con` needs a `transactions` relation with the tool columns.
+    `con` needs a `transactions` relation with the tool columns. Activity share is
+    relative to the account's activity from the start of the data to `history_end`
+    (by default the end of the data the tools show, as the tool does; detection passes
+    `end`, so no feature looks past the period).
     """
     period = {"start": start, "end": end}
     con.execute(
@@ -73,7 +82,7 @@ def score_population(con: duckdb.DuckDBPyConnection, start: datetime, end: datet
             WHERE NOT is_self_transfer AND ts BETWEEN $p0 AND $pe)
         GROUP BY ALL
         """,
-        {"p0": DATA_START, "pe": PRIMARY_END},
+        {"p0": DATA_START, "pe": history_end or data_end()},
     )
     con.execute(
         """

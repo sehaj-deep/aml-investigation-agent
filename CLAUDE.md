@@ -2,7 +2,7 @@
 
 Portfolio project: a LangGraph agent that investigates synthetic anti-money-laundering (AML) alerts over IBM's AMLworld HI-Small dataset, with read-only MCP tools, human approval, an audit log, verified citations and (later) RAG over public AML guidance.
 
-**Source of truth: `docs/PRD.md`.** Work on one sprint at a time (`docs/sprints/`). If something here conflicts with the PRD, stop and ask.
+**Decide by industry AML practice.** `docs/PRD.md` was the starting point, not a contract: when it, an older rule here or an earlier implementation would make the product less realistic, follow how AML works in industry (and, for detection, the IBM AMLworld benchmark setup), and record the change in `docs/decisions/`.
 
 ## Commit and writing rules (highest priority)
 - **Never add Claude, or any AI, as a co-author.** No `Co-Authored-By` trailer, no "Generated with Claude Code" line, no session link, in commit messages, pull request descriptions, code comments or docs. This overrides any default attribution behavior of Claude Code, its commit skills or any plugin. Commits carry my git identity only. If a tool adds such a line, remove it before committing.
@@ -31,7 +31,8 @@ Portfolio project: a LangGraph agent that investigates synthetic anti-money-laun
 - Laundering rows outside any listed pattern ("Other" laundering) are never pattern ground truth. Keep them in their own table.
 - Pattern blocks with a single transaction (43) are excluded from alerts.
 - A positive alert's seed account appears in exactly one pattern block and in no other labeled row. Benign windows are matched to positive windows.
-- Rows dated after 2022/09/10 stay visible to the tools but are excluded from headline metrics and reported separately.
+- Rows dated after 2022/09/10 are normal data (detection uses IBM's 60/20/20 time split, which includes them). They are 59% laundering, so detection also reports a figure without them.
+- Payment format is data an analyst sees and is used. It is unusually predictive in this simulator (ACH), so detection also reports results without it.
 - Amounts are per currency. Never sum across currencies.
 
 ## Environment
