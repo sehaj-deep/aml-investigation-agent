@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased: detection model
+- Open-source XGBoost detection model on 31 account features, chronological split; test PR-AUC 0.274 against 0.083 for the rules; transaction F1 24.8%.
+- Explained alert queue (top three factors per alert) sampled from the top 2,000 accounts, for the investigation evaluation.
+- Decision record 0012; scorecard part A updated.
+
 ## Unreleased: Sprint 2 (audit and faithfulness), pending owner review and a live model
 - Append-only, hash-chained audit log of every model call, tool call, state change and decision; UPDATE, DELETE and TRUNCATE blocked; a case rebuilt from the log alone matches the live run exactly.
 - OpenTelemetry traces exported to a Postgres `traces` table.

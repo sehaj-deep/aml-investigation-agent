@@ -1,0 +1,4 @@
+-c requirements.txt
+# Detection component (roadmap phase H): trained once, offline
+xgboost
+numpy

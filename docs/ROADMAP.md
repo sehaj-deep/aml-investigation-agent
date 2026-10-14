@@ -52,7 +52,7 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 - Local login with roles (analyst, supervisor) for the four-eyes flow; no real authentication claims.
 
 **H. Later, optional: ML detection**
-- A graph-feature model (scikit-learn) scoring accounts, chronological split on the primary period, compared against the rules (PR-AUC against the base rate). Only after A to G.
+- Done early, approved by the owner (2026-10-14): an open-source XGBoost model on account features, chronological split, compared against the rules (decision 0012, scorecard part A). It generates the alert queue for the investigation evaluation.
 
 **G. Final evaluation and hardening**
 - Freeze, then run the untouched evaluation set once on the chosen model; report with repeats and spreads.

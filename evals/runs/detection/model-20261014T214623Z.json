@@ -1,0 +1,239 @@
+{
+  "created_utc": "20261014T214623Z",
+  "model": "XGBoost on account features (aml_agent/detection)",
+  "params": {
+    "objective": "binary:logistic",
+    "eval_metric": "aucpr",
+    "tree_method": "hist",
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 5,
+    "seed": 7,
+    "nthread": 8
+  },
+  "best_iteration": 435,
+  "features": [
+    "n_transfers",
+    "n_in",
+    "n_out",
+    "n_cp",
+    "receives_and_pays",
+    "currency_switch",
+    "new_counterparty_share",
+    "one_time_counterparty_share",
+    "period_activity_share",
+    "onward_within_24h_share",
+    "rule_score",
+    "top_counterparty_score",
+    "senders",
+    "receivers",
+    "one_off_senders",
+    "one_off_receivers",
+    "reciprocal_counterparties",
+    "currencies_in",
+    "currencies_out",
+    "amount_z_mean",
+    "amount_z_max",
+    "amount_z_min",
+    "amount_z_std",
+    "active_hours_span",
+    "transfers_per_active_day",
+    "median_hours_to_onward",
+    "cp_rule_score_mean",
+    "cp_rule_score_max",
+    "cp_currency_switch_count",
+    "cp_degree_max",
+    "cp_one_time_share_mean"
+  ],
+  "periods": {
+    "train": [
+      [
+        "2022-09-02T00:00:00",
+        "2022-09-03T23:59:00"
+      ],
+      [
+        "2022-09-04T00:00:00",
+        "2022-09-06T13:35:00"
+      ]
+    ],
+    "validation": [
+      "2022-09-06T13:36:00",
+      "2022-09-08T16:11:00"
+    ],
+    "test": [
+      "2022-09-08T16:12:00",
+      "2022-09-10T23:59:00"
+    ]
+  },
+  "rows": {
+    "train": 600468,
+    "train_positive": 2590,
+    "test": 356183,
+    "test_positive": 1671,
+    "test_pattern_positive": 879
+  },
+  "account_level_test": {
+    "base_rate": 0.00469,
+    "average_precision_model": 0.274,
+    "average_precision_rules": 0.0826,
+    "validation_average_precision_model": 0.3144,
+    "alert_budgets": [
+      {
+        "scorer": "model",
+        "alerts": 100,
+        "true_cases": 99,
+        "precision": 0.99,
+        "recall": 0.0592,
+        "recall_pattern": 0.0967
+      },
+      {
+        "scorer": "model",
+        "alerts": 250,
+        "true_cases": 217,
+        "precision": 0.868,
+        "recall": 0.1299,
+        "recall_pattern": 0.2298
+      },
+      {
+        "scorer": "model",
+        "alerts": 500,
+        "true_cases": 313,
+        "precision": 0.626,
+        "recall": 0.1873,
+        "recall_pattern": 0.3356
+      },
+      {
+        "scorer": "model",
+        "alerts": 1000,
+        "true_cases": 401,
+        "precision": 0.401,
+        "recall": 0.24,
+        "recall_pattern": 0.413
+      },
+      {
+        "scorer": "model",
+        "alerts": 2000,
+        "true_cases": 512,
+        "precision": 0.256,
+        "recall": 0.3064,
+        "recall_pattern": 0.4846
+      },
+      {
+        "scorer": "rules",
+        "alerts": 100,
+        "true_cases": 66,
+        "precision": 0.66,
+        "recall": 0.0395,
+        "recall_pattern": 0.0751
+      },
+      {
+        "scorer": "rules",
+        "alerts": 250,
+        "true_cases": 98,
+        "precision": 0.392,
+        "recall": 0.0586,
+        "recall_pattern": 0.1115
+      },
+      {
+        "scorer": "rules",
+        "alerts": 500,
+        "true_cases": 108,
+        "precision": 0.216,
+        "recall": 0.0646,
+        "recall_pattern": 0.1217
+      },
+      {
+        "scorer": "rules",
+        "alerts": 1000,
+        "true_cases": 149,
+        "precision": 0.149,
+        "recall": 0.0892,
+        "recall_pattern": 0.1638
+      },
+      {
+        "scorer": "rules",
+        "alerts": 2000,
+        "true_cases": 218,
+        "precision": 0.109,
+        "recall": 0.1305,
+        "recall_pattern": 0.2298
+      }
+    ]
+  },
+  "transaction_level_test": {
+    "laundering_transactions": 1141,
+    "transactions": 993724,
+    "threshold_from_validation": {
+      "threshold": 0.51159,
+      "flagged": 604,
+      "precision": 0.3576,
+      "recall": 0.1893,
+      "f1": 0.2476
+    },
+    "best_on_test_optimistic": {
+      "precision": 0.3247,
+      "recall": 0.2086,
+      "f1": 0.254
+    }
+  },
+  "top_features_by_gain": [
+    [
+      "currency_switch",
+      297.24
+    ],
+    [
+      "new_counterparty_share",
+      250.42
+    ],
+    [
+      "currencies_out",
+      238.6
+    ],
+    [
+      "rule_score",
+      227.19
+    ],
+    [
+      "cp_currency_switch_count",
+      215.96
+    ],
+    [
+      "reciprocal_counterparties",
+      180.2
+    ],
+    [
+      "cp_rule_score_max",
+      161.85
+    ],
+    [
+      "receives_and_pays",
+      159.92
+    ],
+    [
+      "one_off_senders",
+      127.88
+    ],
+    [
+      "top_counterparty_score",
+      112.0
+    ],
+    [
+      "amount_z_max",
+      108.49
+    ],
+    [
+      "senders",
+      98.43
+    ]
+  ],
+  "alert_queue": {
+    "budget": 2000,
+    "sample": 150,
+    "seed": 20261014
+  },
+  "alerts_written": 150,
+  "alerts_true": 33,
+  "seconds": 110.4
+}

@@ -54,7 +54,8 @@ def mark_windows_only(path: Path) -> None:
 def main() -> None:
     compile_lock("requirements.in", "requirements.txt")
     compile_lock("requirements-dev.in", "requirements-dev.txt", "--allow-unsafe")
-    for name in ("requirements.txt", "requirements-dev.txt"):
+    compile_lock("requirements-detection.in", "requirements-detection.txt")
+    for name in ("requirements.txt", "requirements-dev.txt", "requirements-detection.txt"):
         mark_windows_only(ROOT / name)
 
 
