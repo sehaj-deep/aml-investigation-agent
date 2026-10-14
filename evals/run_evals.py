@@ -65,7 +65,11 @@ def block_tx_ids(con, block_id: int) -> set[int]:
 
 
 async def run_set(
-    name: str, limit: int | None, only: list[str] | None = None, debug_dir: Path | None = None
+    name: str,
+    limit: int | None,
+    only: list[str] | None = None,
+    debug_dir: Path | None = None,
+    repeats: int = 1,
 ) -> list[dict]:
     alerts = {a.alert_id: a for a in read_alerts(name)}
     truth = read_truth(name)
@@ -79,9 +83,9 @@ async def run_set(
     rows = []
     async with connect_graph() as client:
         app = compile_graph(provider, client, InMemorySaver(), verifier=verifier)
-        for t in truth:
+        for t, repeat in [(t, r) for t in truth for r in range(1, repeats + 1)]:
             alert = alerts[t.alert_id]
-            cfg = {"configurable": {"thread_id": t.alert_id}}
+            cfg = {"configurable": {"thread_id": f"{t.alert_id}-r{repeat}"}}
             start = time.perf_counter()
             error = None
             try:
@@ -112,6 +116,7 @@ async def run_set(
             rows.append(
                 {
                     "alert_id": t.alert_id,
+                    "repeat": repeat,
                     "label": t.label,
                     "late_block": t.runs_past_primary_period,
                     "expected_pattern": expected,
@@ -140,11 +145,11 @@ async def run_set(
             if debug_dir is not None:
                 debug_dir.mkdir(parents=True, exist_ok=True)
                 dump = {"truth": t.model_dump(), "block_tx_ids": sorted(block), **values}
-                (debug_dir / f"{t.alert_id}.json").write_text(
+                (debug_dir / f"{t.alert_id}-r{repeat}.json").write_text(
                     json.dumps(dump, indent=2, default=str), encoding="utf-8"
                 )
             print(
-                f"  {t.alert_id} {t.label:8} {expected:>14} -> "
+                f"  {t.alert_id} r{repeat} {t.label:8} {expected:>14} -> "
                 f"{case.get('pattern_hypothesis')!s:<14} faithful={ver.get('faithful')}"
             )
     return rows
@@ -196,6 +201,77 @@ def aggregate(rows: list[dict]) -> dict:
     }
 
 
+def stability(rows: list[dict]) -> dict:
+    """Run-to-run spread when each alert ran several times.
+
+    Per alert: the answers given, the majority answer and how often runs agreed with
+    it. Overall: each metric computed per repeat, then its mean, spread and range.
+    """
+    ok = [r for r in rows if not r["error"]]
+    per_alert = {}
+    for alert_id in sorted({r["alert_id"] for r in ok}):
+        runs = [r for r in ok if r["alert_id"] == alert_id]
+        answers = [r["predicted_pattern"] for r in runs]
+        majority = max(set(answers), key=lambda a: (answers.count(a), str(a)))
+        covs = [r["evidence_coverage"] for r in runs if r["evidence_coverage"] is not None]
+        per_alert[alert_id] = {
+            "expected": runs[0]["expected_pattern"],
+            "answers": answers,
+            "majority": majority,
+            "majority_correct": majority == runs[0]["expected_pattern"],
+            "agreement": round(answers.count(majority) / len(answers), 4),
+            "coverage": covs or None,
+            "actions": [r["recommended_action"] for r in runs],
+        }
+
+    def spread(key: str, items_for) -> dict | None:
+        values = []
+        for rep in sorted({r["repeat"] for r in ok}):
+            v = items_for(rep)
+            if v is not None:
+                values.append(v)
+        if not values:
+            return None
+        return {
+            "per_repeat": values,
+            "mean": round(statistics.mean(values), 4),
+            "stdev": round(statistics.pstdev(values), 4),
+            "min": min(values),
+            "max": max(values),
+        }
+
+    def per_repeat(rep: int, key: str, positives_only: bool = False) -> float | None:
+        agg = aggregate(
+            [
+                r
+                for r in ok
+                if r["repeat"] == rep and (not positives_only or r["label"] == "positive")
+            ]
+        )
+        return agg[key]
+
+    return {
+        "alerts": len(per_alert),
+        "repeats": len({r["repeat"] for r in ok}),
+        "mean_agreement": round(statistics.mean(a["agreement"] for a in per_alert.values()), 4)
+        if per_alert
+        else None,
+        "majority_vote_accuracy": round(
+            sum(a["majority_correct"] for a in per_alert.values()) / len(per_alert), 4
+        )
+        if per_alert
+        else None,
+        "pattern_accuracy": spread("pattern_accuracy", lambda k: per_repeat(k, "pattern_accuracy")),
+        "mean_evidence_coverage": spread(
+            "mean_evidence_coverage", lambda k: per_repeat(k, "mean_evidence_coverage")
+        ),
+        "mean_evidence_precision": spread(
+            "mean_evidence_precision", lambda k: per_repeat(k, "mean_evidence_precision")
+        ),
+        "per_alert": per_alert,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--set", default="dev", choices=["dev", "eval"])
@@ -205,13 +281,14 @@ def main() -> None:
     parser.add_argument(
         "--debug", action="store_true", help="save each case's full state (gitignored)"
     )
+    parser.add_argument("--repeats", type=int, default=1, help="runs per alert")
     args = parser.parse_args()
     if args.set == "eval" and not freeze_tag_exists():
         raise SystemExit(f"refusing the eval set: tag {FREEZE_TAG!r} does not exist yet")
     os.environ["LLM_PROVIDER"] = args.provider
     only = args.only.split(",") if args.only else None
     debug_dir = ROOT / "evals" / "runs" / args.set / "debug" if args.debug else None
-    rows = asyncio.run(run_set(args.set, args.limit, only, debug_dir))
+    rows = asyncio.run(run_set(args.set, args.limit, only, debug_dir, args.repeats))
     headline = [r for r in rows if not r["late_block"]]
     late = [r for r in rows if r["late_block"]]
     provider = get_provider()
@@ -220,6 +297,8 @@ def main() -> None:
         "headline_primary_period_only": aggregate(headline),
         "late_blocks_reported_separately": aggregate(late),
     }
+    if args.repeats > 1:
+        summary["stability"] = stability(rows)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_dir = ROOT / "evals" / "runs" / args.set
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -230,6 +309,7 @@ def main() -> None:
         "provider": provider.provider,
         "model": provider.model,
         "prompt_version": PROMPT_VERSION,
+        "repeats": args.repeats,
         "note": "scripted: harness check only, not a model result"
         if provider.provider == "scripted"
         else "live run, uncached",

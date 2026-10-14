@@ -42,6 +42,7 @@ def test_no_write_tools_exist():
         "get_account_summary",
         "get_neighbors",
         "trace_funds",
+        "get_transfers_among",
         "get_transactions",
     }
 
@@ -170,3 +171,35 @@ def test_neighbors_both_reports_requested_direction(tools):
     out = tools.get_neighbors(**SEED, **WINDOW, direction="both")
     assert out["direction"] == "both"
     assert {c["direction"] for c in out["counterparties"]} == {"in", "out"}
+
+
+def test_neighbors_show_hub_hints(tools):
+    # FAN00001's only sender is SEED0001, which is paid by 151 accounts (HOP00001 and
+    # 150 BULK accounts) and pays 6 accounts (self-transfers excluded).
+    out = tools.get_neighbors(bank_id=2, account="FAN00001", **WINDOW, direction="in")
+    seed = out["counterparties"][0]
+    assert (seed["account"], seed["their_senders"], seed["their_receivers"]) == ("SEED0001", 151, 6)
+
+
+def test_transfers_among_returns_only_the_group_structure(tools):
+    group = [
+        {"bank_id": 1, "account": "SEED0001"},
+        {"bank_id": 2, "account": "FAN00001"},
+        {"bank_id": 3, "account": "HOP00001"},
+        {"bank_id": 9, "account": "NOBODY01"},
+    ]
+    out = tools.get_transfers_among(accounts=group, **WINDOW)
+    assert [t["tx_id"] for t in out["transfers"]] == [1, 7, 8, 11]  # the cycle, no self-transfers
+    assert out["unconnected_accounts"] == [{"bank_id": 9, "account": "NOBODY01"}]
+    euro = next(t for t in out["transfers"] if t["tx_id"] == 7)
+    assert euro["currency_paid"] == "Euro"
+
+
+def test_transfers_among_caps_and_validates(tools):
+    many = [{"bank_id": 4, "account": f"BULK{i:04d}"} for i in range(40)]
+    out = tools.get_transfers_among(accounts=[{"bank_id": 1, "account": "SEED0001"}, *many])
+    assert out["capped"]["accounts"] == {"requested": 41, "applied": graph.MAX_GROUP_ACCOUNTS}
+    with pytest.raises(ValidationError):
+        tools.get_transfers_among(accounts=[{"bank_id": 1, "account": "SEED0001"}])
+    with pytest.raises(ValidationError):
+        tools.get_transfers_among(accounts=[{"bank_id": 1, "account": "bad one"}] * 2)

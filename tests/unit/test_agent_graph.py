@@ -75,7 +75,13 @@ def test_agent_tool_calls_go_through_mcp_only(tool_dir):
     paused = run(tool_dir, "basic", start)
     names = [e["name"] for e in paused.values["tool_log"]]
     assert names[0] == "get_account_summary"
-    assert set(names) <= {"get_account_summary", "get_neighbors", "trace_funds", "get_transactions"}
+    assert set(names) <= {
+        "get_account_summary",
+        "get_neighbors",
+        "trace_funds",
+        "get_transfers_among",
+        "get_transactions",
+    }
 
 
 def test_finalize_without_decision_is_refused(tool_dir):

@@ -66,7 +66,9 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
         include_self_transfers: bool = False,
     ) -> dict:
         """Counterparties of an account in a time window (most active first). direction:
-        "in" (who sent money to it), "out" (who it paid) or "both". Each comes with
+        "in" (who sent money to it), "out" (who it paid) or "both". Each counterparty also
+        shows their_senders and their_receivers: how many distinct accounts it is paid by
+        and pays in the window (a high number marks a hub). Each comes with
         per-currency totals, first and last time and up to 20 tx_ids. At most 100
         counterparties."""
         return tools().get_neighbors(
@@ -101,6 +103,21 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
             direction=direction,
             hops=hops,
             max_edges=max_edges,
+        )
+
+    @mcp.tool(annotations=READ_ONLY)
+    def get_transfers_among(
+        accounts: list[dict],
+        window_start: datetime | None = None,
+        window_end: datetime | None = None,
+        limit: int = 200,
+    ) -> dict:
+        """Transfers whose sender and receiver are BOTH in a group of 2 to 30 accounts, each
+        given as {"bank_id": int, "account": str}. Use it once you know which accounts form
+        the pattern: it shows the pattern's own transfers without their other activity, and
+        lists group accounts that have no transfer with the rest of the group."""
+        return tools().get_transfers_among(
+            accounts=accounts, window_start=window_start, window_end=window_end, limit=limit
         )
 
     @mcp.tool(annotations=READ_ONLY)

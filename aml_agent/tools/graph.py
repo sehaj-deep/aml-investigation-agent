@@ -35,6 +35,8 @@ MAX_TRACE_EDGES = 300
 MAX_FANOUT_PER_NODE = 20
 MAX_TX_IDS = 100
 MAX_WINDOW = timedelta(days=31)
+MAX_GROUP_ACCOUNTS = 30
+MAX_GROUP_TRANSFERS = 300
 DATA_START = datetime(2022, 9, 1)
 PRIMARY_PERIOD_END = datetime(2022, 9, 10, 23, 59)  # last minute shown by default
 FULL_DATA_END = datetime(2022, 9, 19)
@@ -103,6 +105,16 @@ class TraceArgs(AccountArgs):
     max_edges: int = Field(default=100, ge=1)
 
 
+class AccountRef(_Args):
+    bank_id: int = Field(ge=0, le=10_000_000)
+    account: str = Field(pattern=ACCOUNT_PATTERN)
+
+
+class AmongArgs(WindowArgs):
+    accounts: list[AccountRef] = Field(min_length=2)
+    limit: int = Field(default=200, ge=1)
+
+
 class TransactionsArgs(_Args):
     tx_ids: list[int] = Field(min_length=1)
 
@@ -149,6 +161,37 @@ class GraphTools:
             "SELECT bank_name, jurisdiction FROM banks WHERE bank_id = ?", [bank_id]
         ).fetchone()
         return {"bank_name": row[0], "jurisdiction": row[1]} if row else {}
+
+    def _degrees(
+        self, accounts: list[tuple[int, str]], start: datetime, end: datetime
+    ) -> dict[tuple[int, str], dict[str, int]]:
+        """Distinct senders and receivers of each account in the window (no self-transfers)."""
+        out = {acc: {"their_senders": 0, "their_receivers": 0} for acc in accounts}
+        if not accounts:
+            return out
+        params = {
+            "banks": [b for b, _ in accounts],
+            "accts": [a for _, a in accounts],
+            "start": start,
+            "end": end,
+        }
+        for key, here_b, here_a, there_b, there_a in (
+            ("their_receivers", "from_bank", "from_account", "to_bank", "to_account"),
+            ("their_senders", "to_bank", "to_account", "from_bank", "from_account"),
+        ):
+            rows = self.con.execute(
+                f"""
+                WITH cp AS (SELECT DISTINCT unnest($banks) AS b, unnest($accts) AS a)
+                SELECT t.{here_b}, t.{here_a}, count(DISTINCT (t.{there_b}, t.{there_a}))
+                FROM transactions t JOIN cp ON t.{here_b} = cp.b AND t.{here_a} = cp.a
+                WHERE NOT t.is_self_transfer AND t.ts BETWEEN $start AND $end
+                GROUP BY 1, 2
+                """,
+                params,
+            ).fetchall()
+            for b, a, n in rows:
+                out[(b, a)][key] = n
+        return out
 
     @staticmethod
     def _cap(capped: dict, name: str, requested: int, limit: int) -> int:
@@ -270,6 +313,7 @@ class GraphTools:
             },
         ).fetchall()
         total = rows[0][8] if rows else 0
+        degrees = self._degrees([(r[1], r[2]) for r in rows], start, end)
         counterparties = []
         for leg, cp_bank, cp_account, n_tx, first_ts, last_ts, tx_ids, totals, _ in rows:
             counterparties.append(
@@ -287,6 +331,9 @@ class GraphTools:
                     "last_ts": _ts(last_ts),
                     "tx_ids": tx_ids[:MAX_TX_IDS_PER_COUNTERPARTY],
                     "tx_ids_truncated": len(tx_ids) > MAX_TX_IDS_PER_COUNTERPARTY,
+                    # How many distinct accounts this counterparty itself pays and is paid
+                    # by in the window: a large number marks a hub worth following.
+                    **degrees[(cp_bank, cp_account)],
                 }
             )
         return {
@@ -388,6 +435,73 @@ class GraphTools:
             "edges": edges,
             "accounts_reached": len(visited) - 1,
             "truncated": truncated or len(edges) >= max_edges,
+            "capped": capped,
+        }
+
+    def get_transfers_among(self, **kwargs: Any) -> dict[str, Any]:
+        """Transfers whose sender AND receiver are both in a chosen group of accounts.
+
+        Use it once the suspected pattern's accounts are known: the result is the
+        pattern's structure without the accounts' unrelated activity.
+        """
+        args = AmongArgs(**kwargs)
+        capped: dict = {}
+        start, end = self._window(args, capped)
+        group = list(dict.fromkeys((a.bank_id, a.account) for a in args.accounts))
+        if len(group) > MAX_GROUP_ACCOUNTS:
+            capped["accounts"] = {"requested": len(group), "applied": MAX_GROUP_ACCOUNTS}
+            group = group[:MAX_GROUP_ACCOUNTS]
+        limit = self._cap(capped, "limit", args.limit, MAX_GROUP_TRANSFERS)
+        rows = self.con.execute(
+            """
+            WITH g AS (SELECT unnest($banks) AS b, unnest($accts) AS a)
+            SELECT t.tx_id, t.ts, t.from_bank, t.from_account, t.to_bank, t.to_account,
+                   t.amount_paid, t.currency_paid, t.amount_received, t.currency_received,
+                   count(*) OVER () AS total
+            FROM transactions t
+            JOIN g s ON t.from_bank = s.b AND t.from_account = s.a
+            JOIN g r ON t.to_bank = r.b AND t.to_account = r.a
+            WHERE NOT t.is_self_transfer AND t.ts BETWEEN $start AND $end
+            ORDER BY t.ts, t.tx_id
+            LIMIT $limit
+            """,
+            {
+                "banks": [b for b, _ in group],
+                "accts": [a for _, a in group],
+                "start": start,
+                "end": end,
+                "limit": limit,
+            },
+        ).fetchall()
+        total = rows[0][10] if rows else 0
+        transfers = [
+            {
+                "tx_id": r[0],
+                "ts": _ts(r[1]),
+                "from_bank": r[2],
+                "from_account": r[3],
+                "to_bank": r[4],
+                "to_account": r[5],
+                "amount_paid": _amount(r[6]),
+                "currency_paid": r[7],
+                "amount_received": _amount(r[8]),
+                "currency_received": r[9],
+            }
+            for r in rows
+        ]
+        linked = {(t["from_bank"], t["from_account"]) for t in transfers} | {
+            (t["to_bank"], t["to_account"]) for t in transfers
+        }
+        return {
+            "window": {"start": _ts(start), "end": _ts(end)},
+            "accounts": len(group),
+            "transfers": transfers,
+            "total_transfers": total,
+            "truncated": total > len(transfers),
+            # Group accounts with no transfer to or from another group member.
+            "unconnected_accounts": [
+                {"bank_id": b, "account": a} for b, a in group if (b, a) not in linked
+            ],
             "capped": capped,
         }
 

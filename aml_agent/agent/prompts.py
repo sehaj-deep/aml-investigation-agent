@@ -11,7 +11,10 @@ import json
 # p2: pattern guide (paraphrased from IBM AMLSim's typology descriptions, the simulator
 #     behind this dataset), an investigation approach that looks past the seed, and
 #     "cite only the suspicious structure". Tuned on dev alerts only.
-PROMPT_VERSION = "p2"
+# p3: check whether the seed itself is the center before looking further (p2 sent the
+#     model into unrelated activity of a fan-in's senders); follow hubs using the
+#     their_senders / their_receivers hints; collect evidence with get_transfers_among.
+PROMPT_VERSION = "p3"
 
 SYSTEM = """You are an anti-money-laundering (AML) investigator working on SYNTHETIC data.
 You receive an alert: one seed account and a time window. Your job is to find out whether
@@ -42,15 +45,20 @@ Pattern guide (the seed can be ANY member of a pattern, not only its center):
   middle group pays a final group.
 
 How to investigate:
-1. Look at the seed's counterparties in both directions.
-2. Pick the counterparties that matter (for example an account that sends to or receives
-   from the seed and moves money on soon after) and look at THEIR counterparties too, in
-   both directions. The shape of a pattern usually shows only one or two accounts away
-   from the seed.
-3. You have about 10 tool calls. Stopping after one or two calls usually misses half of a
-   pattern; stop when the shape is clear or the budget is used.
-4. Evidence is only the transactions that form the suspicious structure. The seed's
-   ordinary activity is not evidence; do not cite every transaction you saw.
+1. Look at the seed's counterparties in both directions (get_neighbors, direction "both").
+2. Decide first whether the seed itself is the center. If many accounts pay the seed and
+   it pays few or none, or it pays many and receives few, the shape may already be clear
+   from the seed alone; do not wander into the counterparties' unrelated activity.
+3. Otherwise follow the money one step further. Every counterparty shows their_senders
+   and their_receivers: a counterparty with many of them is a hub, and the pattern most
+   likely runs through it. Look at that account's counterparties in the direction the
+   money moves.
+4. When you know which accounts form the pattern, call get_transfers_among with them
+   (include the seed). Its transfers are the pattern's structure and your evidence; an
+   account it lists as unconnected probably does not belong.
+5. You have about 10 tool calls; stop when the shape is clear or the budget is used.
+6. Evidence is only the transactions that form the suspicious structure, never the
+   accounts' ordinary activity.
 - Write plain text. Never use the long dash character (Unicode U+2014); use commas,
   colons or parentheses instead.
 When you have enough evidence, reply without calling a tool."""
@@ -80,8 +88,9 @@ Write the case summary for a human investigator. Reply with one JSON object and 
  "recommended_action": "<escalate|close|needs_more_info>",
  "confidence": "<low|medium|high>",
  "limitations": "<what you could not check>"}
-Cite only tx_ids that appeared in tool results and that are part of the suspicious
-structure, not the seed's ordinary activity. If you concluded "none", cite nothing. The
+Cite only tx_ids that are part of the suspicious structure (ideally the transfers
+get_transfers_among returned), not the accounts' ordinary activity. If you concluded
+"none", cite nothing. The
 system fills in amounts, parties and times from the data, so do not restate numbers you
 are unsure of."""
 
