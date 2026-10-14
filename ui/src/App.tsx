@@ -1,4 +1,4 @@
-import { Layout, Menu, Segmented, Space, Tag, Typography } from 'antd'
+import { Layout, Menu, Segmented, Space, Tag, Tooltip, Typography } from 'antd'
 import {
   AlertOutlined,
   AuditOutlined,
@@ -37,14 +37,16 @@ export default function App() {
           <Typography.Text strong style={{ color: '#fff', fontSize: 15 }}>
             AML Case Manager
           </Typography.Text>
-          <Tag color="gold" style={{ marginInlineStart: 4 }}>
-            SYNTHETIC DATA
-          </Tag>
+          <Tooltip title="Sandbox environment: all accounts and transactions are synthetic (IBM AMLworld).">
+            <Tag color="gold" style={{ marginInlineStart: 4 }}>
+              SANDBOX
+            </Tag>
+          </Tooltip>
         </Space>
         <div style={{ flex: 1 }} />
         <Space size={8}>
           <Typography.Text style={{ color: '#c9d6ea', fontSize: 12 }}>
-            Signed in as <b style={{ color: '#fff' }}>{user.name}</b> (demo, no authentication)
+            Working as <b style={{ color: '#fff' }}>{user.name}</b>
           </Typography.Text>
           <Segmented<Role>
             size="small"

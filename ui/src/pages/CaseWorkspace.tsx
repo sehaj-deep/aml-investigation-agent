@@ -361,7 +361,7 @@ function DecisionCard({ c }: { c: CaseDetail }) {
                 showIcon
                 icon={<LockOutlined />}
                 message="Four-eyes rule: accepting an escalation requires supervisor approval."
-                description="Enforced in this screen for the demo; server-side enforcement is planned."
+                description="Switch to the Supervisor role to accept an escalation."
               />
             )}
             <Input.TextArea

@@ -1,5 +1,5 @@
-// Local demo identity: a name and a role, kept in the browser. No real authentication;
-// the UI says so. Roles drive the four-eyes flow (analyst proposes, supervisor confirms).
+// Working role, kept in the browser. There is no login by design (anyone can use the
+// sandbox); the role drives the four-eyes flow (analyst proposes, supervisor confirms).
 import { createContext, useContext, useState, type ReactNode } from 'react'
 
 export type Role = 'analyst' | 'supervisor'
@@ -28,7 +28,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       // storage unavailable: keep the role for this session only
     }
   }
-  const name = role === 'analyst' ? 'analyst.demo' : 'supervisor.demo'
+  const name = role === 'analyst' ? 'AML Analyst' : 'AML Supervisor'
   return <UserContext.Provider value={{ name, role, setRole }}>{children}</UserContext.Provider>
 }
 
