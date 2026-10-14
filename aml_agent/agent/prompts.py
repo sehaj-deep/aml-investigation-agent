@@ -19,7 +19,10 @@ import json
 #     collects the evidence; the model no longer chooses transactions.
 # p5: the case file marks one-off relationships and lists pattern candidates found by
 #     code (C1 to C3); the model judges them and may name a candidate by its id.
-PROMPT_VERSION = "p5"
+# p6: the drafted summary is written for a bank investigator in AML typology language
+#     (funds concentration, pass-through account, round-tripping, layering) instead of
+#     the simulator's pattern names. Pattern keys in the JSON are unchanged.
+PROMPT_VERSION = "p6"
 
 SYSTEM = """You are an anti-money-laundering (AML) investigator working on SYNTHETIC data.
 You receive an alert: one seed account and a time window, and a CASE FILE that code has
@@ -105,6 +108,11 @@ above. Reply with one JSON object and nothing else:
  "recommended_action": "<escalate|close|needs_more_info>",
  "confidence": "<low|medium|high>",
  "limitations": "<what you could not check>"}
+Write for a bank investigator in plain AML language: describe the activity with typology
+terms such as rapid dispersion of funds, funds concentration (funnel activity), pass-through
+account, layering via intermediaries, round-tripping or a layering chain, and do not use the
+internal pattern names (fan-in, fan-out, gather-scatter, scatter-gather, cycle, random,
+bipartite, stack) in the summary or limitations.
 Do not restate amounts you are unsure of; the evidence rows carry the exact figures."""
 
 

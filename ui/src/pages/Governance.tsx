@@ -42,11 +42,11 @@ export default function Governance() {
               The AI reaches data only through read-only, bounded tools; it never sees labels.
             </Descriptions.Item>
             <Descriptions.Item label="Evidence">
-              Collected by code from the accounts the AI names; every cited transaction is verified
-              against the source data before review.
+              Supporting transactions are collected by the system from the accounts the AI identifies,
+              and each one is verified against the source data before review.
             </Descriptions.Item>
             <Descriptions.Item label="Human approval">
-              No case is finalized without a recorded human decision.
+              No case is closed without a recorded analyst decision; escalations require supervisor approval.
             </Descriptions.Item>
             <Descriptions.Item label="Audit">
               Append-only, hash-chained log of every model call, tool call and decision.

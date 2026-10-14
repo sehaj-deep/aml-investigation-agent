@@ -134,18 +134,18 @@ export default function NetworkGraph({ graph, evidenceTxIds, highlight }: Props)
     highlight.forEach((label) => instance.getElementById(label).addClass('hl'))
   }, [highlight, graph, evidenceTxIds])
 
-  if (!graph || graph.nodes.length === 0) return <Empty description="No network yet" />
+  if (!graph || graph.nodes.length === 0) return <Empty description="Network not available yet" />
 
   return (
     <div>
       <div ref={ref} className="network" />
       <Space size={12} wrap style={{ marginTop: 6, fontSize: 12 }}>
-        <span><Tag color="#c05621">A0</Tag>seed</span>
+        <span><Tag color="#c05621">A0</Tag>subject</span>
         <span><Tag color="#1d4e89">1</Tag>direct counterparty</span>
-        <span><Tag color="#7a8aa0">2</Tag>second step</span>
-        <span><Tag color="#6b46c1">T</Tag>found by trace</span>
-        <span>dashed: one-off relationship</span>
-        <span style={{ color: '#c53030' }}>red: evidence</span>
+        <span><Tag color="#7a8aa0">2</Tag>second-degree counterparty</span>
+        <span><Tag color="#6b46c1">T</Tag>found by money trace</span>
+        <span>dashed: first-time counterparty (1 to 2 transfers)</span>
+        <span style={{ color: '#c53030' }}>red: supporting transactions</span>
         <span>red ring: highlighted accounts</span>
       </Space>
       {selected && (

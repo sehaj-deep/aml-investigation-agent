@@ -8,13 +8,13 @@ import { ActionTag, PatternTag, StatusTag, VerifiedBadge } from '../components/b
 
 const STATUS_FILTERS: { label: string; value: CaseStatus | 'all' | 'open' }[] = [
   { label: 'All', value: 'all' },
-  { label: 'Open (not closed)', value: 'open' },
-  { label: 'Awaiting review', value: 'pending_review' },
-  { label: 'AI investigating', value: 'running' },
-  { label: 'Queued', value: 'queued' },
-  { label: 'Decided: approved', value: 'approved' },
-  { label: 'Decided: rejected', value: 'rejected' },
-  { label: 'Failed', value: 'failed' },
+  { label: 'Open cases', value: 'open' },
+  { label: 'Pending analyst review', value: 'pending_review' },
+  { label: 'Automated review in progress', value: 'running' },
+  { label: 'New', value: 'queued' },
+  { label: 'Closed: AI accepted', value: 'approved' },
+  { label: 'Closed: AI overridden', value: 'rejected' },
+  { label: 'Processing error', value: 'failed' },
 ]
 
 export default function CaseQueue() {
@@ -64,7 +64,7 @@ export default function CaseQueue() {
             />
             <Input.Search
               allowClear
-              placeholder="Case, alert or account"
+              placeholder="Case, alert or subject account"
               onChange={(e) => setSearch(e.target.value)}
               style={{ width: 280 }}
             />
@@ -94,14 +94,14 @@ export default function CaseQueue() {
               ),
             },
             { title: 'Status', dataIndex: 'status', render: (v: CaseStatus) => <StatusTag status={v} /> },
-            { title: 'AI pattern', dataIndex: 'pattern', render: (v) => <PatternTag pattern={v} /> },
+            { title: 'Typology (AI)', dataIndex: 'pattern', render: (v) => <PatternTag pattern={v} /> },
             {
               title: 'AI recommendation',
               dataIndex: 'recommended_action',
               render: (v) => <ActionTag action={v} />,
             },
             { title: 'Confidence', dataIndex: 'confidence', render: (v) => v ?? '' },
-            { title: 'Evidence', dataIndex: 'n_evidence', align: 'right' },
+            { title: 'Supporting txns', dataIndex: 'n_evidence', align: 'right' },
             {
               title: 'Verified',
               dataIndex: 'faithful',
@@ -110,7 +110,7 @@ export default function CaseQueue() {
             },
             { title: 'Warnings', dataIndex: 'n_warnings', align: 'right' },
             {
-              title: 'Age',
+              title: 'Opened',
               dataIndex: 'created_at',
               render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
               sorter: (a, b) => a.created_at.localeCompare(b.created_at),

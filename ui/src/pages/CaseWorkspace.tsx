@@ -30,6 +30,7 @@ import { api, type CaseDetail, type Decision, type Evidence } from '../api'
 import { ActionTag, PatternTag, StatusTag, VerifiedBadge } from '../components/badges'
 import NetworkGraph from '../components/NetworkGraph'
 import { useUser } from '../user'
+import { DECISION_LABEL, DECISION_PAST, typologyName } from '../terms'
 
 const LIVE = new Set(['queued', 'running', 'decision_recorded'])
 
@@ -144,10 +145,10 @@ export default function CaseWorkspace() {
                             onChange={setHighlightId}
                             style={{ width: 320 }}
                             options={[
-                              { value: 'evidence', label: 'Accounts in the evidence' },
+                              { value: 'evidence', label: 'Accounts in the supporting transactions' },
                               ...(c.analysis?.candidates ?? []).map((x) => ({
                                 value: x.id,
-                                label: `${x.id}: ${x.kind} (${x.accounts.length} accounts)`,
+                                label: `${x.id}: ${typologyName(x.kind)} (${x.accounts.length} accounts)`,
                               })),
                             ]}
                           />
@@ -158,14 +159,14 @@ export default function CaseWorkspace() {
                   },
                   {
                     key: 'evidence',
-                    label: `Evidence (${c.draft?.evidence.length ?? 0})`,
+                    label: `Supporting transactions (${c.draft?.evidence.length ?? 0})`,
                     children: (
                       <Table<Evidence>
                         size="small"
                         rowKey="tx_id"
                         dataSource={c.draft?.evidence ?? []}
                         pagination={{ pageSize: 15, showSizeChanger: false }}
-                        locale={{ emptyText: <Empty description="No evidence collected" /> }}
+                        locale={{ emptyText: <Empty description="No supporting transactions" /> }}
                         columns={[
                           { title: 'Tx', dataIndex: 'tx_id', render: (v) => <span className="mono">{v}</span> },
                           { title: 'Time', dataIndex: 'timestamp' },
@@ -193,26 +194,26 @@ export default function CaseWorkspace() {
                   },
                   {
                     key: 'candidates',
-                    label: `Pattern candidates (${c.analysis?.candidates.length ?? 0})`,
+                    label: `Typology indicators (${c.analysis?.candidates.length ?? 0})`,
                     children: (
                       <Table
                         size="small"
                         rowKey="id"
                         dataSource={c.analysis?.candidates ?? []}
                         pagination={false}
-                        locale={{ emptyText: <Empty description="Code found no one-off structure" /> }}
+                        locale={{ emptyText: <Empty description="No indicators: no first-time counterparty structure found" /> }}
                         onRow={(x) => ({ onClick: () => setHighlightId(x.id), style: { cursor: 'pointer' } })}
                         columns={[
                           { title: 'Id', dataIndex: 'id' },
-                          { title: 'Kind', dataIndex: 'kind', render: (v) => <PatternTag pattern={v} /> },
+                          { title: 'Typology', dataIndex: 'kind', render: (v) => <PatternTag pattern={v} /> },
                           { title: 'Accounts', dataIndex: 'accounts', render: (v: string[]) => v.join(', ') },
                           { title: 'Transfers', render: (_, x) => x.tx_ids.length, align: 'right' },
-                          { title: 'Why', dataIndex: 'reason' },
+                          { title: 'Basis', dataIndex: 'reason' },
                         ]}
                       />
                     ),
                   },
-                  { key: 'timeline', label: 'Audit timeline', children: <AuditTab caseId={c.case_id} /> },
+                  { key: 'timeline', label: 'Audit trail', children: <AuditTab caseId={c.case_id} /> },
                 ]}
               />
             </Card>
@@ -234,13 +235,13 @@ function AssessmentCard({ c }: { c: CaseDetail }) {
   const d = c.draft
   const hyp = c.analysis?.hypothesis
   return (
-    <Card size="small" title={<span className="panel-title">AI assessment</span>}>
+    <Card size="small" title={<span className="panel-title">AI assessment (advisory)</span>}>
       {!d ? (
-        <Empty description={LIVE.has(c.status) ? 'The AI is investigating' : 'No assessment'} />
+        <Empty description={LIVE.has(c.status) ? 'Automated review in progress' : 'No assessment'} />
       ) : (
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <Space wrap>
-            <span>Pattern</span>
+            <span>Typology</span>
             <PatternTag pattern={d.pattern_hypothesis} />
             <span>Recommendation</span>
             <ActionTag action={d.recommended_action} />
@@ -261,8 +262,8 @@ function AssessmentCard({ c }: { c: CaseDetail }) {
             <span>
               {c.verification
                 ? c.verification.faithful
-                  ? `Evidence verified against the data (${c.verification.evidence_rows} transactions)`
-                  : 'Evidence verification failed'
+                  ? `Supporting transactions verified against source data (${c.verification.evidence_rows})`
+                  : 'Verification of supporting transactions failed'
                 : 'Not verified'}
             </span>
           </Space>
@@ -282,10 +283,10 @@ function AssessmentCard({ c }: { c: CaseDetail }) {
           )}
           <Row gutter={8}>
             <Col span={8}>
-              <Statistic title="AI steps" value={Number(c.metrics.steps ?? 0)} />
+              <Statistic title="AI reasoning steps" value={Number(c.metrics.steps ?? 0)} />
             </Col>
             <Col span={8}>
-              <Statistic title="Tool calls" value={Number(c.metrics.tool_calls ?? 0)} />
+              <Statistic title="Data lookups" value={Number(c.metrics.tool_calls ?? 0)} />
             </Col>
             <Col span={8}>
               <Statistic
@@ -298,12 +299,6 @@ function AssessmentCard({ c }: { c: CaseDetail }) {
       )}
     </Card>
   )
-}
-
-const DECISION_TEXT: Record<Decision['action'], string> = {
-  approve: 'Approved the AI recommendation',
-  reject: 'Rejected the AI recommendation',
-  request_more: 'Requested more investigation',
 }
 
 function DecisionCard({ c }: { c: CaseDetail }) {
@@ -328,7 +323,7 @@ function DecisionCard({ c }: { c: CaseDetail }) {
   const canDecide = c.status === 'pending_review'
 
   return (
-    <Card size="small" title={<span className="panel-title">Decision</span>}>
+    <Card size="small" title={<span className="panel-title">Analyst decision</span>}>
       <Space direction="vertical" size={10} style={{ width: '100%' }}>
         {c.decisions.length > 0 && (
           <List
@@ -338,7 +333,7 @@ function DecisionCard({ c }: { c: CaseDetail }) {
               <List.Item>
                 <Space direction="vertical" size={0}>
                   <span>
-                    <b>{DECISION_TEXT[d.action]}</b> by {d.reviewer}
+                    <b>{DECISION_PAST[d.action]}</b> by {d.reviewer}
                   </span>
                   <Typography.Text type="secondary">
                     {dayjs(d.decided_at).format('YYYY-MM-DD HH:mm')}: {d.reason}
@@ -355,9 +350,9 @@ function DecisionCard({ c }: { c: CaseDetail }) {
               onChange={(e) => setAction(e.target.value)}
               optionType="button"
               options={[
-                { value: 'approve', label: 'Approve recommendation' },
-                { value: 'reject', label: 'Reject' },
-                { value: 'request_more', label: 'Request more' },
+                { value: 'approve', label: DECISION_LABEL.approve },
+                { value: 'reject', label: DECISION_LABEL.reject },
+                { value: 'request_more', label: DECISION_LABEL.request_more },
               ]}
             />
             {escalation && (
@@ -365,13 +360,13 @@ function DecisionCard({ c }: { c: CaseDetail }) {
                 type={needsSupervisor ? 'warning' : 'info'}
                 showIcon
                 icon={<LockOutlined />}
-                message="Four-eyes rule: approving an escalation needs the Supervisor role."
+                message="Four-eyes rule: accepting an escalation requires supervisor approval."
                 description="Enforced in this screen for the demo; server-side enforcement is planned."
               />
             )}
             <Input.TextArea
               rows={3}
-              placeholder="Reason (required, recorded in the audit log)"
+              placeholder="Rationale for the decision (required, recorded in the audit trail)"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
@@ -388,10 +383,10 @@ function DecisionCard({ c }: { c: CaseDetail }) {
         ) : (
           <Typography.Text type="secondary">
             {LIVE.has(c.status)
-              ? 'Waiting for the AI to finish.'
+              ? 'Automated review in progress.'
               : c.status === 'pending_review'
                 ? ''
-                : 'This case is decided. Decisions cannot be changed.'}
+                : 'This case is closed. Recorded decisions cannot be changed.'}
           </Typography.Text>
         )}
       </Space>

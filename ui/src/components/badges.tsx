@@ -1,15 +1,20 @@
 import { Tag, Tooltip } from 'antd'
 import { CheckCircleFilled, CloseCircleFilled, QuestionCircleFilled } from '@ant-design/icons'
 import type { CaseStatus } from '../api'
+import { RECOMMENDATION, TYPOLOGY } from '../terms'
 
 const STATUS: Record<CaseStatus, { color: string; text: string }> = {
-  queued: { color: 'default', text: 'Queued' },
-  running: { color: 'processing', text: 'AI investigating' },
-  pending_review: { color: 'orange', text: 'Awaiting review' },
+  queued: { color: 'default', text: 'New' },
+  running: { color: 'processing', text: 'Automated review in progress' },
+  pending_review: { color: 'orange', text: 'Pending analyst review' },
   decision_recorded: { color: 'processing', text: 'Applying decision' },
-  approved: { color: 'blue', text: 'Decided: approved' },
-  rejected: { color: 'purple', text: 'Decided: rejected' },
-  failed: { color: 'magenta', text: 'Failed' },
+  approved: { color: 'blue', text: 'Closed: AI recommendation accepted' },
+  rejected: { color: 'purple', text: 'Closed: AI recommendation overridden' },
+  failed: { color: 'magenta', text: 'Processing error' },
+}
+
+export function statusText(status: string): string {
+  return STATUS[status as CaseStatus]?.text ?? status
 }
 
 export function StatusTag({ status }: { status: CaseStatus }) {
@@ -17,32 +22,28 @@ export function StatusTag({ status }: { status: CaseStatus }) {
   return <Tag color={s.color}>{s.text}</Tag>
 }
 
-const ACTION: Record<string, { color: string; text: string }> = {
-  escalate: { color: 'volcano', text: 'Escalate' },
-  close: { color: 'green', text: 'Close' },
-  needs_more_info: { color: 'gold', text: 'Needs more info' },
-}
-
 export function ActionTag({ action }: { action: string | null | undefined }) {
-  if (!action) return <Tag>None yet</Tag>
-  const a = ACTION[action] ?? { color: 'default', text: action }
-  return <Tag color={a.color}>{a.text}</Tag>
+  if (!action) return <Tag>Not assessed yet</Tag>
+  const a = RECOMMENDATION[action] ?? { color: 'default', name: action }
+  return <Tag color={a.color}>{a.name}</Tag>
 }
 
 export function PatternTag({ pattern }: { pattern: string | null | undefined }) {
-  if (!pattern) return <Tag>None yet</Tag>
-  return <Tag color={pattern === 'none' ? 'default' : 'geekblue'}>{pattern}</Tag>
+  if (!pattern) return <Tag>Not assessed yet</Tag>
+  const t = TYPOLOGY[pattern]
+  const tag = <Tag color={pattern === 'none' ? 'default' : 'geekblue'}>{t?.name ?? pattern}</Tag>
+  return t ? <Tooltip title={t.description}>{tag}</Tooltip> : tag
 }
 
 export function VerifiedBadge({ faithful }: { faithful: boolean | null | undefined }) {
   if (faithful === null || faithful === undefined)
     return (
-      <Tooltip title="Not verified yet">
+      <Tooltip title="Supporting transactions not verified yet">
         <QuestionCircleFilled style={{ color: '#a0aec0' }} />
       </Tooltip>
     )
   return faithful ? (
-    <Tooltip title="Every cited transaction exists and matches the data">
+    <Tooltip title="Every supporting transaction exists and matches the source data">
       <CheckCircleFilled style={{ color: '#2f855a' }} />
     </Tooltip>
   ) : (
