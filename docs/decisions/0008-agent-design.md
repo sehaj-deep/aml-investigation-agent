@@ -13,3 +13,7 @@ Status: accepted (Sprint 1), pending owner review
 - **Persistence.** LangGraph `AsyncPostgresSaver` (thread_id = case_id) plus a `cases`/`decisions` work queue claimed with `FOR UPDATE SKIP LOCKED` and a lease.
 - **Provider interface.** `ChatProvider` with `ollama` (LangChain ChatOllama, retry with backoff) and `scripted` (deterministic policies for tests and CI; its numbers are harness checks, not model results).
 - **Windows note.** psycopg async needs the selector event loop, which cannot spawn subprocesses, so on Windows the worker reaches MCP over HTTP (`MCP_URL`), as it does in Docker.
+
+## Update 2026-10-14: giveaways hidden (owner decision)
+
+Two signals reveal the label without investigation: payment format (nearly all laundering is ACH) and dates after Sep 10 (only laundering, per the dataset author). Both are hidden from the tools by default (`TOOLS_SHOW_PAYMENT_FORMAT=false`, `TOOLS_SHOW_LATE_ROWS=false`): windows are clipped to 2022-09-10 23:59 and `get_transactions` treats later rows as not found. This is also realistic, since an investigator on Sep 10 cannot see the future. Both stay switchable so one comparison run can show how much each giveaway would inflate results. The verifier still checks citations against the full Parquet data.

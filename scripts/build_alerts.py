@@ -11,7 +11,7 @@ from aml_agent.alerts.io import ALERTS_DIR, write_sets
 from aml_agent.data.views import connect
 
 DEFAULT_SEED = 20261014
-VERSION = "v1"
+VERSION = "v2"  # v2: only patterns that finish by 2022-09-10; windows clipped
 
 
 def main() -> None:
@@ -28,6 +28,7 @@ def main() -> None:
         "dev_per_type": gen.DEV_PER_TYPE,
         "eval_per_type": gen.EVAL_PER_TYPE,
         "window_padding_hours": gen.WINDOW_PADDING.total_seconds() / 3600,
+        "primary_period_only": True,
         "source_seed_eligible_sha256": parquet_manifest["outputs"]["seed_eligible.parquet"],
     }
     manifest = write_sets(sets, ALERTS_DIR, meta)

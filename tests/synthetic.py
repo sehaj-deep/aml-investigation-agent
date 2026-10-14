@@ -7,6 +7,8 @@ Shape:
 - SEED0001 has two self-transfers (hidden by default).
 - HOP00001 sends to SEED0001 on 2022-09-03 (closes a cycle).
 - 150 accounts BULK0000..BULK0149 each pay SEED0001 once (for limit caps).
+- One late row on 2022-09-12 (after the primary period): SEED0001 pays LATE0001 in
+  Swiss Francs. Hidden from the tools by default.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import duckdb
 from aml_agent.data.tooldb import TOOL_DB_NAME
 
 SEED = {"bank_id": 1, "account": "SEED0001"}
+LATE_TX_ID = 162
 DAY = datetime(2022, 9, 2)
 
 
@@ -42,6 +45,7 @@ def rows() -> list[tuple]:
     add(DAY + timedelta(days=1), 3, "HOP00001", 1, "SEED0001", 80, "US Dollar")
     for i in range(150):
         add(DAY + timedelta(days=2, minutes=i), 4, f"BULK{i:04d}", 1, "SEED0001", 1, "Yuan")
+    add(datetime(2022, 9, 12, 9), 1, "SEED0001", 3, "LATE0001", 77, "Swiss Franc")
     return out
 
 

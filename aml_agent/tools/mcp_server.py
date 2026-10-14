@@ -34,7 +34,8 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
         instructions=(
             "Read-only tools over a synthetic transaction graph. Accounts are identified by "
             "(bank_id, account). Amounts are per currency; never add amounts in different "
-            "currencies. Times are ISO 8601 without time zone."
+            "currencies. Times are ISO 8601 without time zone. Data runs from 2022-09-01 to "
+            "2022-09-10."
         ),
         host=host,
         port=port,

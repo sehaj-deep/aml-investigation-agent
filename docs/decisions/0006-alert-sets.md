@@ -11,3 +11,7 @@ Status: accepted (Sprint 0), PRD section 10 and FR-1
 - Seed 20261014, version v1. `evals/alerts/manifest.json` records the checksums and the seed_eligible table checksum.
 
 Result (v1): dev 48 alerts (24 positive), eval 80 (40 positive). Alerts running past 09/10: dev 14, eval 42.
+
+## Update 2026-10-14: alert sets v2 (owner decision)
+
+The dataset author's note (Kaggle discussion with Marco Pianta) says the days after 2022/09/10 contain no legitimate transactions; they exist only so late patterns can finish. Any activity after Sep 10 therefore gives the answer away. v2 draws positives only from seed-eligible blocks that finish by Sep 10 (11 to 31 per type, enough for 8), clips windows to end at 2022-09-10 23:59, and computes benign activity buckets on primary-period rows only. Result: dev 48 alerts (24 positive), eval 80 (40 positive), none run past Sep 10. The eval set was regenerated before any freeze tag existed.

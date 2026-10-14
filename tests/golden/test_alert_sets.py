@@ -45,8 +45,10 @@ def test_positive_seeds_follow_seed_rule(con, name):
             [t.block_id],
         ).fetchone()
         assert n_tx >= 2
+        assert last_ts < gen.PRIMARY_PERIOD_END, "pattern must finish by 2022-09-10"
         assert a.window_start == first_ts - timedelta(hours=24)
-        assert a.window_end == last_ts + timedelta(hours=24)
+        assert a.window_end == min(last_ts + timedelta(hours=24), gen.LAST_PRIMARY_MINUTE)
+        assert not t.runs_past_primary_period
 
 
 @pytest.mark.parametrize("name", ["dev", "eval"])

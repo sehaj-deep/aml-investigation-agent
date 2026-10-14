@@ -6,7 +6,11 @@ Every tool:
 - validates arguments with Pydantic (malformed arguments are rejected);
 - caps hops, rows and windows, and reports any cap it applied in `capped`;
 - reports amounts per currency and never sums across currencies;
-- hides self-transfers unless asked, and reports how many were hidden.
+- hides self-transfers unless asked, and reports how many were hidden;
+- shows only the primary period (up to 2022-09-10 23:59) by default. The dataset
+  author notes that the days after Sep 10 contain only laundering, so showing them
+  would give the answer away (TOOLS_SHOW_LATE_ROWS=true shows them, for comparison);
+- hides payment format by default for the same reason (TOOLS_SHOW_PAYMENT_FORMAT).
 Amounts are returned as strings so no precision is lost.
 """
 
@@ -32,9 +36,19 @@ MAX_FANOUT_PER_NODE = 20
 MAX_TX_IDS = 100
 MAX_WINDOW = timedelta(days=31)
 DATA_START = datetime(2022, 9, 1)
-DATA_END = datetime(2022, 9, 19)
+PRIMARY_PERIOD_END = datetime(2022, 9, 10, 23, 59)  # last minute shown by default
+FULL_DATA_END = datetime(2022, 9, 19)
 
 ACCOUNT_PATTERN = r"^[0-9A-Z]{1,20}$"
+
+
+def show_late_rows() -> bool:
+    """Rows after Sep 10 are all laundering (dataset author's note). Off by default."""
+    return os.environ.get("TOOLS_SHOW_LATE_ROWS", "false").lower() == "true"
+
+
+def data_end() -> datetime:
+    return FULL_DATA_END if show_late_rows() else PRIMARY_PERIOD_END
 
 
 def show_payment_format() -> bool:
@@ -108,11 +122,12 @@ class GraphTools:
     # Helpers
 
     def _window(self, args: WindowArgs, capped: dict) -> tuple[datetime, datetime]:
+        last = data_end()
         start = args.window_start or DATA_START
-        end = args.window_end or DATA_END
-        start, end = max(start, DATA_START), min(end, DATA_END)
+        end = args.window_end or last
+        start, end = max(start, DATA_START), min(end, last)
         if end <= start:
-            raise ValueError("window lies outside the data (2022-09-01 to 2022-09-19)")
+            raise ValueError(f"window lies outside the data ({_ts(DATA_START)} to {_ts(last)})")
         if end - start > MAX_WINDOW:
             capped["window_end"] = {"requested": _ts(end), "applied": _ts(start + MAX_WINDOW)}
             end = start + MAX_WINDOW
@@ -380,10 +395,10 @@ class GraphTools:
             FROM transactions t
             LEFT JOIN banks fb ON fb.bank_id = t.from_bank
             LEFT JOIN banks tb ON tb.bank_id = t.to_bank
-            WHERE t.tx_id IN (SELECT unnest(?))
+            WHERE t.tx_id IN (SELECT unnest(?)) AND t.ts <= ?
             ORDER BY t.tx_id
             """,
-            [ids],
+            [ids, data_end()],
         ).fetchall()
         records = []
         for r in rows:

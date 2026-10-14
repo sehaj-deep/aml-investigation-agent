@@ -1,14 +1,15 @@
 {
-  "version": "v1",
+  "version": "v2",
   "seed": 20261014,
   "dev_per_type": 3,
   "eval_per_type": 5,
   "window_padding_hours": 24.0,
+  "primary_period_only": true,
   "source_seed_eligible_sha256": "ef843d40cc250159afa0a931eeab38c7ad6db29d169971e83cf7a5c2cce612d9",
   "files": {
-    "dev.jsonl": "2dec0c0337cae2d7444046b6d9486157bef0cff676f4b768ae9b0b337431e257",
-    "ground_truth/dev.jsonl": "8ab000aab43f7435dc9bf4d01fe7ab4810c71e92a1e66107278ed5b73b30e007",
-    "eval.jsonl": "f1f31d310e57f9501f523741a4042091091d28ef1b00b3519dd0c58ed2ed2124",
-    "ground_truth/eval.jsonl": "b53da643a7863ebea42413eeb769cc8dfbaab8a98b55268a1eb09d21b1d3e533"
+    "dev.jsonl": "8a37d26afa23073abb237029229760294d500aead01d5990777b6776ae5a9c4d",
+    "ground_truth/dev.jsonl": "c0e17e5005903be98d81e96de4cee821b4cd9dae697c7f9811fc0d35f110694a",
+    "eval.jsonl": "50af6bf9e03e86494fbc232c4756b5fd8d9b579ba80b143ffe9f30adcc44abb4",
+    "ground_truth/eval.jsonl": "117b67847f8a72de1809a7285824001eaf5355781b92320f00380a4925c7f27b"
   }
 }

@@ -71,7 +71,7 @@ def test_long_window_is_capped(tools):
     out = tools.get_account_summary(
         **SEED, window_start="2022-09-01T00:00", window_end="2023-09-01T00:00"
     )
-    assert out["window"]["end"] == "2022-09-19T00:00"  # clipped to the data, under 31 days
+    assert out["window"]["end"] == "2022-09-10T23:59"  # clipped to the primary period
 
 
 @pytest.mark.parametrize(
@@ -134,3 +134,16 @@ def test_payment_format_hidden_by_default(tools, monkeypatch):
     monkeypatch.setenv("TOOLS_SHOW_PAYMENT_FORMAT", "true")
     out = tools.get_transactions(tx_ids=[1])
     assert out["transactions"][0]["payment_format"] == "Wire"
+
+
+def test_rows_after_primary_period_hidden_by_default(tools, monkeypatch):
+    late_id = synthetic.LATE_TX_ID
+    out = tools.get_account_summary(**SEED)
+    assert "Swiss Franc" not in {s["currency"] for s in out["sent"]}
+    assert tools.get_transactions(tx_ids=[late_id])["not_found"] == [late_id]
+    neighbors = tools.get_neighbors(**SEED, direction="out")
+    assert "LATE0001" not in {c["account"] for c in neighbors["counterparties"]}
+    monkeypatch.setenv("TOOLS_SHOW_LATE_ROWS", "true")
+    assert tools.get_transactions(tx_ids=[late_id])["transactions"][0]["tx_id"] == late_id
+    out = tools.get_account_summary(**SEED)
+    assert "Swiss Franc" in {s["currency"] for s in out["sent"]}

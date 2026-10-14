@@ -1,8 +1,11 @@
 """Seeded generation of the dev and evaluation alert sets (PRD section 10).
 
 Positives: per pattern type, draw blocks from the seed-eligible multi-row blocks
-(3 dev, 5 eval). The seed is a seeded draw from that block's eligible accounts.
-The window is the block's span padded on both sides.
+that finish within the primary period (by 2022-09-10), 3 dev and 5 eval. The
+dataset author notes that the days after Sep 10 hold only laundering, so patterns
+running past it would be incomplete or give the answer away. The seed is a seeded
+draw from that block's eligible accounts. The window is the block's span padded
+on both sides and clipped to the primary period.
 
 Benign controls: one per positive. The seed is an account in no labeled row,
 in the same activity bucket as the positive's seed (non-self transactions and
@@ -26,6 +29,7 @@ import duckdb
 from aml_agent.alerts.models import Alert, GroundTruth
 
 PRIMARY_PERIOD_END = datetime(2022, 9, 11)  # rows at or after this are the tail
+LAST_PRIMARY_MINUTE = PRIMARY_PERIOD_END - timedelta(minutes=1)
 WINDOW_PADDING = timedelta(hours=24)
 DEV_PER_TYPE = 3
 EVAL_PER_TYPE = 5
@@ -48,10 +52,10 @@ def _activity_sql(where: str = "TRUE") -> str:
         WITH legs AS (
             SELECT from_bank AS bank_id, from_account AS account,
                    to_bank AS cp_bank, to_account AS cp_account
-            FROM transactions WHERE NOT is_self_transfer
+            FROM transactions WHERE NOT is_self_transfer AND ts < '2022-09-11'
             UNION ALL
             SELECT to_bank, to_account, from_bank, from_account
-            FROM transactions WHERE NOT is_self_transfer
+            FROM transactions WHERE NOT is_self_transfer AND ts < '2022-09-11'
         )
         SELECT bank_id, account, count(*) AS n_tx,
                count(DISTINCT (cp_bank, cp_account)) AS degree
@@ -83,8 +87,10 @@ def generate(
         """
         SELECT DISTINCT b.block_id, b.pattern_type, b.first_ts, b.last_ts
         FROM pattern_blocks b JOIN seed_eligible s USING (block_id)
+        WHERE b.last_ts < ?
         ORDER BY b.pattern_type, b.block_id
-        """
+        """,
+        [PRIMARY_PERIOD_END],
     ).fetchall()
     by_type: dict[str, list[tuple]] = {}
     for row in blocks:
@@ -106,7 +112,7 @@ def generate(
                     "block_id": block_id,
                     "pattern_type": ptype,
                     "seed": (bank_id, account),
-                    "window": (first_ts - padding, last_ts + padding),
+                    "window": (first_ts - padding, min(last_ts + padding, LAST_PRIMARY_MINUTE)),
                     "late": last_ts >= PRIMARY_PERIOD_END,
                 }
             )
