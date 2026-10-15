@@ -4,6 +4,8 @@
 
 An AI-assisted anti-money-laundering (AML) case manager, built the way a bank's financial-crime team works. Transaction monitoring raises alerts, an AI agent investigates each alert and drafts a recommendation, and human analysts decide under a four-eyes rule. Escalated cases get a suspicious activity report (SAR) draft. Every AI claim is checked against the data or the cited guidance, and every step is recorded in a tamper-evident audit log.
 
+**Live demo:** https://aml-investigation-agent.onrender.com (free hosting; the first visit after a quiet spell can take a minute).
+
 > **Sandbox.** Everything runs on IBM's **synthetic** AMLworld dataset (HI-Small). Nothing here is a production AML system, and results on synthetic data do not show performance on real bank data. Nothing is ever filed with any authority.
 
 ## What it does
