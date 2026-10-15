@@ -40,3 +40,6 @@ evals/runs/**/debug/
 # UI build output and dependencies
 ui/node_modules/
 ui/dist/
+evals/runs/**/triage-scripted-*.json
+# Progress files of interrupted runs; the final result file holds every case
+evals/runs/**/progress-*.jsonl
