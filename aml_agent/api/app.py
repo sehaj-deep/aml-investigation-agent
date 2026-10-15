@@ -99,7 +99,12 @@ def create_app(pool=None) -> FastAPI:
     @app.get("/demo")
     async def demo_status(request: Request) -> dict:
         """Whether this is the public demo, and the live AI actions left today."""
-        return await demo.status(app.state.pool, visitor(request))
+        out = await demo.status(app.state.pool, visitor(request))
+        if out.get("demo"):
+            # How many forwarding entries arrived (a count only, never an address), to set
+            # DEMO_TRUSTED_PROXY_HOPS for the host.
+            out["forwarded_entries"] = len(demo.forwarded_entries(request.headers))
+        return out
 
     @app.get("/health")
     async def health() -> dict:

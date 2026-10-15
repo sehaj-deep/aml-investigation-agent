@@ -65,6 +65,15 @@ def test_limits_are_off_outside_the_demo(monkeypatch):
 def test_visitor_ids_do_not_store_addresses():
     vid = demo.visitor_id("203.0.113.7")
     assert "203.0.113.7" not in vid and len(vid) == 16
-    assert demo.client_address({"x-forwarded-for": "203.0.113.7, 10.0.0.1"}, "10.0.0.9") == (
-        "203.0.113.7"
-    )
+
+
+def test_forged_forwarding_entries_do_not_change_the_visitor(monkeypatch):
+    monkeypatch.setenv("DEMO_TRUSTED_PROXY_HOPS", "1")
+    real = {"x-forwarded-for": "203.0.113.7, 10.0.0.1"}  # visitor, then our proxy
+    forged = {"x-forwarded-for": "198.51.100.1, 203.0.113.7, 10.0.0.1"}
+    assert demo.client_address(real, "10.0.0.9") == "203.0.113.7"
+    assert demo.client_address(forged, "10.0.0.9") == "203.0.113.7"
+    assert demo.client_address({}, "10.0.0.9") == "10.0.0.9"
+    monkeypatch.setenv("DEMO_TRUSTED_PROXY_HOPS", "2")
+    two = {"x-forwarded-for": "198.51.100.1, 203.0.113.7, 172.16.0.1, 10.0.0.1"}
+    assert demo.client_address(two, None) == "203.0.113.7"

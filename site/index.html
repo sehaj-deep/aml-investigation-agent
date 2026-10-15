@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AML Investigation Agent</title>
+<meta name="description" content="An AI-assisted anti-money-laundering case manager: transaction monitoring, an AI investigation agent with verified evidence, and human decisions under a four-eyes rule. Built on synthetic data.">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1a202c; --muted: #5a6577; --line: #e2e6ec;
+    --accent: #1d4e89; --accent-ink: #ffffff; --good: #2f855a; --warn: #b7791f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f141b; --panel: #161d27; --ink: #e6ebf2; --muted: #9aa7b8; --line: #263142;
+            --accent: #5b9bd5; --accent-ink: #0f141b; --good: #68d391; --warn: #f6c35b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  header { padding: 64px 0 36px; }
+  .tag { display: inline-block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+         color: var(--warn); border: 1px solid var(--warn); border-radius: 4px; padding: 2px 8px; }
+  h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.15; margin: 14px 0 12px; }
+  .lead { font-size: 18px; color: var(--muted); max-width: 760px; margin: 0 0 26px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-block; padding: 11px 20px; border-radius: 6px; font-weight: 600;
+         text-decoration: none; border: 1px solid var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.secondary { color: var(--accent); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  section { padding: 30px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 22px; margin: 0 0 16px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  .card h3 { font-size: 15px; margin: 0 0 6px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  ol.flow { margin: 0; padding-left: 20px; }
+  ol.flow li { margin: 0 0 8px; }
+  .stack { color: var(--muted); font-size: 14px; }
+  footer { padding: 30px 0 50px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="tag">Sandbox: synthetic data</span>
+    <h1>AML Investigation Agent</h1>
+    <p class="lead">An AI-assisted anti-money-laundering case manager. Transaction monitoring raises
+      alerts, an AI agent investigates each one with read-only tools and drafts a recommendation,
+      and analysts decide under a four-eyes rule. Every AI claim is checked against the data.</p>
+    <div class="buttons">
+      <a class="btn primary" href="https://aml-investigation-agent.onrender.com">Try the live demo</a>
+      <a class="btn secondary" href="https://github.com/sehaj-deep/aml-investigation-agent">View the code</a>
+    </div>
+    <p class="note">The demo runs on a free tier: the first visit after a quiet spell can take about a
+      minute. Use the role switch (Analyst, Supervisor) to try the four-eyes flow.</p>
+  </header>
+
+  <section>
+    <h2>Measured results</h2>
+    <div class="grid">
+      <div class="card"><div class="num">71.2%</div><h3>Detection F1</h3>
+        <p>XGBoost on IBM's AMLworld benchmark split, against 63.2% for the best model in IBM's
+          paper (50.6% without the simulator's shortcuts).</p></div>
+      <div class="card"><div class="num">150 / 150</div><h3>Evidence verified</h3>
+        <p>Every transaction the AI cited matched the source data across the frozen
+          150-alert evaluation.</p></div>
+      <div class="card"><div class="num">2&times;</div><h3>Escalation signal</h3>
+        <p>The AI escalated real laundering twice as often as false alarms (49% vs 25%). It also
+          closed 33% of laundering, so people make every decision.</p></div>
+      <div class="card"><div class="num">88.9%</div><h3>Guidance retrieval</h3>
+        <p>Hybrid search (pgvector plus full text) put the right FinCEN or FFIEC document first,
+          against 77.8% for keywords alone. Every quote is checked word for word.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <ol class="flow">
+      <li><b>Monitoring.</b> A model scores every payment; alerts arrive with a priority and the
+        main reasons in plain words.</li>
+      <li><b>AI review.</b> Opening an alert starts a LangGraph agent: code builds the case file,
+        the agent checks history and counterparties through MCP tools, names the pattern, and
+        cites public AML guidance.</li>
+      <li><b>Human decision.</b> The analyst closes, escalates or asks for more. Escalations need a
+        different supervisor, enforced by the server.</li>
+      <li><b>SAR draft.</b> For a confirmed escalation, code assembles the facts and the AI writes the
+        narrative; amounts and citations are checked before a supervisor approves.</li>
+      <li><b>Copilot.</b> The analyst can ask questions; answers stream with each lookup and every
+        cited transaction is verified.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Built with</h2>
+    <p class="stack">LangGraph, Model Context Protocol, Ollama (gpt-oss:20b), FastAPI, Postgres with
+      pgvector, DuckDB, XGBoost with SHAP, React, TypeScript, Ant Design, Cytoscape.js, Docker,
+      GitHub Actions. Design notes, evaluations and model cards are in the repository.</p>
+  </section>
+
+  <footer>
+    Synthetic data only (IBM AMLworld, CDLA-Sharing 1.0); nothing is filed with any authority and
+    results on synthetic data do not show real-world performance.
+  </footer>
+</div>
+</body>
+</html>

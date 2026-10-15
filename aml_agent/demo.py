@@ -50,10 +50,26 @@ def visitor_id(client: str | None) -> str:
     return hashlib.sha256(f"{client or 'unknown'}|{day}".encode()).hexdigest()[:16]
 
 
+def trusted_hops() -> int:
+    """How many X-Forwarded-For entries at the end were added by our own proxies (the
+    host's front end and nginx). The visitor's address is the entry just before them; any
+    entries before that were sent by the client and can be forged."""
+    return int(os.environ.get("DEMO_TRUSTED_PROXY_HOPS", "1"))
+
+
+def forwarded_entries(headers) -> list[str]:
+    forwarded = headers.get("x-forwarded-for") or ""
+    return [e.strip() for e in forwarded.split(",") if e.strip()]
+
+
 def client_address(headers, fallback: str | None) -> str | None:
-    """The visitor's address: the first X-Forwarded-For entry behind the host's proxy."""
-    forwarded = headers.get("x-forwarded-for")
-    return forwarded.split(",")[0].strip() if forwarded else fallback
+    """The visitor's address: the X-Forwarded-For entry added by the first trusted proxy.
+    Taking the first entry instead would let a visitor forge a new identity per request."""
+    entries = forwarded_entries(headers)
+    hops = trusted_hops()
+    if len(entries) > hops:
+        return entries[-(hops + 1)]
+    return entries[0] if entries else fallback
 
 
 async def init(pool: AsyncConnectionPool) -> None:
