@@ -67,7 +67,8 @@ export default function Governance() {
               and each one is verified against the source data before review.
             </Descriptions.Item>
             <Descriptions.Item label="Human approval">
-              No case is closed without a recorded analyst decision; escalations require supervisor approval.
+              No case is closed without a recorded analyst decision. Every escalation must be confirmed by a
+              supervisor other than the person who escalated it, and the server refuses anything else.
             </Descriptions.Item>
             <Descriptions.Item label="Audit">
               Every AI step, data lookup and decision is recorded in a log that cannot be edited

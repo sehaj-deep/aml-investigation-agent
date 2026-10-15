@@ -37,9 +37,9 @@ def finished_case(stack):  # noqa: F811
         httpx.post(f"{api}/cases/{case_id}/decision", json=more).raise_for_status()
         wait_status(api, case_id, "pending_review")
         time.sleep(1)
-        approve = {"action": "approve", "reason": "Supported by evidence.", "reviewer": "tester"}
-        httpx.post(f"{api}/cases/{case_id}/decision", json=approve).raise_for_status()
-        wait_status(api, case_id, "approved")
+        close = {"action": "close", "reason": "Ordinary activity.", "reviewer": "tester"}
+        httpx.post(f"{api}/cases/{case_id}/decision", json=close).raise_for_status()
+        wait_status(api, case_id, "closed")
     finally:
         worker.terminate()
         worker.wait(timeout=30)
@@ -56,7 +56,7 @@ def test_rebuild_from_audit_log_matches_live_run(stack, finished_case):  # noqa:
     live = {k: v for k, v in tup.checkpoint["channel_values"].items() if not k.startswith("_")}
     live = {k: v for k, v in live.items() if not k.startswith("branch:")}
     assert rebuilt == live
-    assert rebuilt["status"] == "approved"
+    assert rebuilt["status"] == "closed"
     types = [e["event_type"] for e in events]
     assert types[0] == "case_created"
     assert types.count("decision_recorded") == 2 and types.count("decision_applied") == 2

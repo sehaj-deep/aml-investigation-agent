@@ -12,7 +12,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 from pydantic import ValidationError
 
-from aml_agent.agent.graph import Budget, FinalizeRefused, compile_graph
+from aml_agent.agent.graph import Budget, FinalizeRefused, FourEyesViolation, compile_graph
 from aml_agent.llm.scripted import ScriptedProvider
 from aml_agent.metrics import case_metrics
 from aml_agent.tools.client import connect_graph
@@ -26,7 +26,14 @@ ALERT = {
     "window_start": "2022-09-01T00:00:00",
     "window_end": "2022-09-10T00:00:00",
 }
-APPROVE = {"action": "approve", "reason": "Evidence supports it.", "reviewer": "tester"}
+CLOSE = {"action": "close", "reason": "Ordinary activity.", "reviewer": "analyst-1"}
+ESCALATE = {"action": "escalate", "reason": "Evidence supports it.", "reviewer": "analyst-1"}
+CONFIRM = {
+    "action": "confirm_escalation",
+    "reason": "Agreed, file the report.",
+    "reviewer": "supervisor-1",
+    "role": "supervisor",
+}
 
 
 @pytest.fixture(scope="module")
@@ -53,10 +60,10 @@ async def start(app, cfg):
     return await app.aget_state(cfg)
 
 
-def test_case_waits_for_approval_then_finalizes(tool_dir):
+def test_case_waits_for_review_then_closes(tool_dir):
     async def steps(app, cfg):
         paused = await start(app, cfg)
-        out = await app.ainvoke(Command(resume=APPROVE), cfg)
+        out = await app.ainvoke(Command(resume=CLOSE), cfg)
         return paused, out
 
     paused, out = run(tool_dir, "basic", steps)
@@ -66,7 +73,7 @@ def test_case_waits_for_approval_then_finalizes(tool_dir):
     assert case["pattern_hypothesis"] == "fan-out"
     assert case["evidence"], "evidence rows are filled from the data"
     assert all(e["tx_id"] in paused.values["seen_tx_ids"] for e in case["evidence"])
-    assert out["status"] == "approved"
+    assert out["status"] == "closed"
     m = case_metrics(paused.values)
     assert m["tool_call_validity"] == 1.0 and m["schema_valid"]
 
@@ -100,9 +107,11 @@ def test_malformed_decision_is_rejected(tool_dir):
     async def steps(app, cfg):
         await start(app, cfg)
         with pytest.raises(ValidationError):
-            await app.ainvoke(Command(resume={"action": "approve"}), cfg)
+            await app.ainvoke(Command(resume={"action": "close"}), cfg)
         with pytest.raises(ValidationError):
-            await app.ainvoke(Command(resume={**APPROVE, "action": "finalize"}), cfg)
+            await app.ainvoke(Command(resume={**CLOSE, "action": "finalize"}), cfg)
+        with pytest.raises(ValueError):  # a supervisor action is not an analyst outcome
+            await app.ainvoke(Command(resume=CONFIRM), cfg)
         return await app.aget_state(cfg)
 
     state = run(tool_dir, "basic", steps)
@@ -157,7 +166,7 @@ def test_benign_conclusion(tool_dir):
 
 
 def test_request_more_reinvestigates_then_round_limit(tool_dir):
-    more = {"action": "request_more", "reason": "Look at inbound flows.", "reviewer": "tester"}
+    more = {"action": "request_more", "reason": "Look at inbound flows.", "reviewer": "analyst-1"}
 
     async def steps(app, cfg):
         await start(app, cfg)
@@ -166,14 +175,67 @@ def test_request_more_reinvestigates_then_round_limit(tool_dir):
         await app.ainvoke(Command(resume=more), cfg)
         await app.ainvoke(Command(resume=more), cfg)
         third = await app.aget_state(cfg)
-        out = await app.ainvoke(Command(resume=APPROVE), cfg)
+        out = await app.ainvoke(Command(resume=CLOSE), cfg)
         return first, third, out
 
     first, third, out = run(tool_dir, "basic", steps, Budget(max_review_rounds=2))
     assert first.values["review_round"] == 1 and first.next == ("human_review",)
     assert third.values["review_round"] == 2
     assert any("review-round limit" in w for w in third.values["warnings"])
-    assert out["status"] == "approved"
+    assert out["status"] == "closed"
+
+
+def test_escalation_waits_for_a_supervisor(tool_dir):
+    async def steps(app, cfg):
+        await start(app, cfg)
+        await app.ainvoke(Command(resume=ESCALATE), cfg)
+        waiting = await app.aget_state(cfg)
+        out = await app.ainvoke(Command(resume=CONFIRM), cfg)
+        return waiting, out
+
+    waiting, out = run(tool_dir, "basic", steps)
+    assert waiting.next == ("supervisor_review",)
+    assert out["status"] == "escalated"
+    assert [d["action"] for d in out["decisions"]] == ["escalate", "confirm_escalation"]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {**CONFIRM, "role": "analyst"},  # not a supervisor
+        {**CONFIRM, "reviewer": "analyst-1"},  # the person who escalated
+    ],
+    ids=["not-a-supervisor", "same-person"],
+)
+def test_four_eyes_violation_never_escalates(tool_dir, bad):
+    # The API refuses these before they reach the workflow (store.record_decision); this
+    # is the workflow's own fail-safe: the case stops instead of escalating.
+    async def steps(app, cfg):
+        await start(app, cfg)
+        await app.ainvoke(Command(resume=ESCALATE), cfg)
+        with pytest.raises(FourEyesViolation):
+            await app.ainvoke(Command(resume=bad), cfg)
+        return await app.aget_state(cfg)
+
+    state = run(tool_dir, "basic", steps)
+    assert state.next == ("supervisor_review",)
+    assert state.values.get("status") != "escalated"
+
+
+def test_supervisor_can_return_an_escalation(tool_dir):
+    back = {**CONFIRM, "action": "return_to_analyst", "reason": "Check the inbound side first."}
+
+    async def steps(app, cfg):
+        await start(app, cfg)
+        await app.ainvoke(Command(resume=ESCALATE), cfg)
+        await app.ainvoke(Command(resume=back), cfg)
+        returned = await app.aget_state(cfg)
+        out = await app.ainvoke(Command(resume=CLOSE), cfg)
+        return returned, out
+
+    returned, out = run(tool_dir, "basic", steps)
+    assert returned.next == ("human_review",)
+    assert out["status"] == "closed"
 
 
 def test_evidence_is_the_transfers_among_the_named_accounts(tool_dir):

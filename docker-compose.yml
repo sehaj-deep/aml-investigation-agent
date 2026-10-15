@@ -52,6 +52,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-aml}
       ALERT_QUEUE_DIR: /data/alert_queue
+      # The copilot answers in the API: the same read-only MCP tools and model provider.
+      MCP_URL: http://mcp-graph:8001/mcp
+      LLM_PROVIDER: ${LLM_PROVIDER:-scripted}
+      LLM_MODEL: ${LLM_MODEL:-gpt-oss:20b-cloud}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # The monitoring alert queue (no labels), loaded into Postgres at startup.
       - ./data/alert_queue:/data/alert_queue:ro
@@ -59,6 +66,8 @@ services:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      mcp-graph:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]

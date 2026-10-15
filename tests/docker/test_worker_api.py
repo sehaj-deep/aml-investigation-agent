@@ -6,6 +6,7 @@ Kill-and-resume: a case paused for review survives a hard worker kill.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -58,7 +59,7 @@ def stack(tmp_path_factory) -> Iterator[dict]:
     }
     with mcp_http_server() as mcp_url:
         port = free_port()
-        api_env = {**os.environ, **env, "API_PORT": str(port)}
+        api_env = {**os.environ, **env, "API_PORT": str(port), "MCP_URL": mcp_url}
         api = subprocess.Popen(
             [sys.executable, "-m", "aml_agent.api"],
             env=api_env,
@@ -108,15 +109,29 @@ def test_kill_worker_while_paused_then_resume(stack):
         worker.wait(timeout=30)
     assert paused["draft"]["evidence"]
 
-    decision = {"action": "approve", "reason": "Consistent with fan-out.", "reviewer": "tester"}
-    assert httpx.post(f"{api}/cases/{case_id}/decision", json=decision).status_code == 200
+    decide = f"{api}/cases/{case_id}/decision"
+    escalate = {"action": "escalate", "reason": "Consistent with fan-out.", "reviewer": "ana"}
+    assert httpx.post(decide, json=escalate).status_code == 200
     worker = start_worker(stack["worker_env"])
     try:
-        final = wait_status(api, case_id, "approved")
+        wait_status(api, case_id, "pending_approval")
+        # Four-eyes rule, enforced by the server: not an analyst, not the escalator.
+        confirm = {
+            "action": "confirm_escalation",
+            "reason": "Agreed, file the report.",
+            "reviewer": "sam",
+            "role": "supervisor",
+        }
+        assert httpx.post(decide, json={**confirm, "role": "analyst"}).status_code == 409
+        assert httpx.post(decide, json={**confirm, "reviewer": "ana"}).status_code == 409
+        assert httpx.post(decide, json={**escalate, "reviewer": "sam"}).status_code == 409
+        assert httpx.post(decide, json=confirm).status_code == 200
+        final = wait_status(api, case_id, "escalated")
     finally:
         worker.terminate()
         worker.wait(timeout=30)
-    assert [d["action"] for d in final["decisions"]] == ["approve"]
+    assert [d["action"] for d in final["decisions"]] == ["escalate", "confirm_escalation"]
+    assert [d["role"] for d in final["decisions"]] == ["analyst", "supervisor"]
     assert final["draft"] == paused["draft"]
 
 
@@ -126,7 +141,7 @@ def test_api_rules(stack):
     assert not any("final" in p for p in paths), "no endpoint may finalize a case"
 
     case_id = httpx.post(f"{api}/cases", json={"alert_id": "dev-0003"}).json()["case_id"]
-    decision = {"action": "approve", "reason": "Too early.", "reviewer": "tester"}
+    decision = {"action": "close", "reason": "Too early.", "reviewer": "tester"}
     r = httpx.post(f"{api}/cases/{case_id}/decision", json=decision)
     assert r.status_code == 409  # queued, not pending_review
 
@@ -167,3 +182,50 @@ def test_stats_work(stack):
     api = stack["api"]
     stats = httpx.get(f"{api}/stats").json()
     assert set(stats) >= {"by_status", "by_recommended_action", "decisions", "verification"}
+
+
+def test_copilot_answers_and_keeps_history(stack):
+    api = stack["api"]
+    case_id = httpx.post(f"{api}/cases", json={"alert_id": "dev-0004"}).json()["case_id"]
+    url = f"{api}/cases/{case_id}/copilot"
+    assert httpx.post(url, json={"question": "Too early?"}).status_code == 409
+    worker = start_worker(stack["worker_env"])
+    try:
+        wait_status(api, case_id, "pending_review")
+    finally:
+        worker.terminate()
+        worker.wait(timeout=30)
+    events = []
+    with httpx.stream("POST", url, json={"question": "What did the subject send?"}) as r:
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("text/event-stream")
+        for line in r.iter_lines():
+            if line.startswith("data: "):
+                events.append(json.loads(line[6:]))
+    assert [e["type"] for e in events] == ["tool", "answer"]
+    answer = events[-1]
+    assert answer["answer"].startswith("Scripted copilot answer")
+    assert answer["unverified"] == []
+    history = httpx.get(url).json()
+    assert history["used"] == 1 and history["answers"][0]["id"] == answer["id"]
+    audit = httpx.get(f"{api}/cases/{case_id}/audit").json()
+    types = [e["event_type"] for e in audit["events"]]
+    assert "copilot_question" in types and "copilot_answer" in types
+    assert httpx.post(url, json={"question": "x"}).status_code == 422
+
+
+def test_failed_review_can_be_retried(stack):
+    api = stack["api"]
+    case_id = httpx.post(f"{api}/cases", json={"alert_id": "dev-0005"}).json()["case_id"]
+    retry = f"{api}/cases/{case_id}/retry"
+    assert httpx.post(retry).status_code == 409  # queued, not failed
+    with psycopg.connect(store.database_url().rsplit("/", 1)[0] + f"/{TEST_DB}") as c:
+        c.execute(
+            "UPDATE cases SET status = 'failed', error = 'McpError: Session terminated' "
+            "WHERE case_id = %s",
+            [case_id],
+        )
+    assert httpx.post(retry).status_code == 200
+    case = httpx.get(f"{api}/cases/{case_id}").json()
+    assert case["status"] == "queued" and case["error"] is None
+    assert httpx.post(f"{api}/cases/nope/retry").status_code == 404

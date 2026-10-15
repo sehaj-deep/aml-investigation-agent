@@ -78,16 +78,21 @@ export const RECOMMENDATION: Record<string, { name: string; color: string }> = {
   needs_more_info: { name: 'More information needed', color: 'gold' },
 }
 
+// Analyst outcomes, then the supervisor's answer to an escalation (four-eyes rule).
 export const DECISION_LABEL = {
-  approve: 'Accept AI recommendation',
-  reject: 'Override AI recommendation',
-  request_more: 'Return for more analysis',
+  close: 'Close: false alarm',
+  escalate: 'Escalate for SAR review',
+  request_more: 'Needs more information',
+  confirm_escalation: 'Confirm escalation',
+  return_to_analyst: 'Return to analyst',
 } as const
 
 export const DECISION_PAST = {
-  approve: 'Accepted the AI recommendation',
-  reject: 'Overrode the AI recommendation',
-  request_more: 'Returned the case for more analysis',
+  close: 'Closed the alert as a false alarm',
+  escalate: 'Escalated for SAR review',
+  request_more: 'Asked the AI for more analysis',
+  confirm_escalation: 'Confirmed the escalation',
+  return_to_analyst: 'Returned the escalation to the analyst',
 } as const
 
 // Alert priority from transaction monitoring. Every alert is worked; the band only

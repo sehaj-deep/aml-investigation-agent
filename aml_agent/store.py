@@ -1,8 +1,12 @@
 """Postgres case store and work queue (cases, decisions).
 
 Case status flow:
-    queued -> running -> pending_review -> decision_recorded -> running
-           -> approved | rejected   (or back to pending_review after "request more")
+    queued -> running -> pending_review -> decision_recorded -> running -> then
+      close         -> closed
+      request_more  -> running (the AI investigates again) -> pending_review
+      escalate      -> pending_approval -> decision_recorded -> running -> then
+          confirm_escalation (a supervisor, not the escalating reviewer) -> escalated
+          return_to_analyst                                             -> pending_review
     any running case can become failed.
 Workers claim cases with FOR UPDATE SKIP LOCKED and a lease, so a case whose
 worker died is picked up again by the next worker.
@@ -20,9 +24,9 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from aml_agent import config  # noqa: F401  (loads .env)
-from aml_agent.schemas.case import Decision
+from aml_agent.schemas.case import ANALYST_ACTIONS, SUPERVISOR_ACTIONS, Decision
 
-FINAL_STATUSES = ("approved", "rejected")
+FINAL_STATUSES = ("closed", "escalated")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS cases (
@@ -30,7 +34,8 @@ CREATE TABLE IF NOT EXISTS cases (
     alert_id       TEXT NOT NULL,
     alert          JSONB NOT NULL,
     status         TEXT NOT NULL CHECK (status IN ('queued', 'running', 'pending_review',
-                       'decision_recorded', 'approved', 'rejected', 'failed')),
+                       'decision_recorded', 'pending_approval', 'closed', 'escalated',
+                       'failed')),
     run_phase      TEXT NOT NULL DEFAULT 'start' CHECK (run_phase IN ('start', 'resume')),
     draft          JSONB,
     warnings       JSONB NOT NULL DEFAULT '[]',
@@ -64,12 +69,30 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE INDEX IF NOT EXISTS alerts_rank_idx ON alerts (rank);
 CREATE INDEX IF NOT EXISTS alerts_priority_idx ON alerts (priority, rank);
 CREATE INDEX IF NOT EXISTS cases_alert_idx ON cases (alert_id, created_at);
+CREATE TABLE IF NOT EXISTS copilot_messages (
+    id            BIGSERIAL PRIMARY KEY,
+    case_id       TEXT NOT NULL REFERENCES cases (case_id),
+    question      TEXT NOT NULL,
+    answer        TEXT NOT NULL,
+    tools         JSONB NOT NULL DEFAULT '[]',
+    cited         JSONB NOT NULL DEFAULT '[]',
+    unverified    JSONB NOT NULL DEFAULT '[]',
+    model         TEXT,
+    version       TEXT,
+    input_tokens  INTEGER,
+    output_tokens INTEGER,
+    seconds       REAL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS copilot_case_idx ON copilot_messages (case_id, id);
 CREATE TABLE IF NOT EXISTS decisions (
     decision_id BIGSERIAL PRIMARY KEY,
     case_id     TEXT NOT NULL REFERENCES cases (case_id),
-    action      TEXT NOT NULL CHECK (action IN ('approve', 'reject', 'request_more')),
+    action      TEXT NOT NULL CHECK (action IN ('close', 'escalate', 'request_more',
+                    'confirm_escalation', 'return_to_analyst')),
     reason      TEXT NOT NULL,
     reviewer    TEXT NOT NULL,
+    role        TEXT NOT NULL DEFAULT 'analyst' CHECK (role IN ('analyst', 'supervisor')),
     decided_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     applied_at  TIMESTAMPTZ
 );
@@ -201,7 +224,7 @@ async def list_alerts(
         where.append("priority = %s")
         params.append(priority)
     if status == "open":
-        where.append("status NOT IN ('approved', 'rejected')")
+        where.append("status NOT IN ('closed', 'escalated')")
     elif status:
         where.append("status = %s")
         params.append(status)
@@ -304,7 +327,46 @@ def _analysis(values: dict) -> dict:
         "risk": values.get("risk"),
         "aliases": values.get("aliases", {}),
         "triggers": values.get("triggers", []),
+        "case_file": values.get("case_file"),
     }
+
+
+async def save_copilot_answer(pool: AsyncConnectionPool, case_id: str, a: dict) -> int:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                """
+                INSERT INTO copilot_messages (case_id, question, answer, tools, cited, unverified,
+                    model, version, input_tokens, output_tokens, seconds)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """,
+                [
+                    case_id,
+                    a["question"],
+                    a["answer"],
+                    Jsonb(a["tools"]),
+                    Jsonb(a["cited"]),
+                    Jsonb(a["unverified"]),
+                    a["model"],
+                    a["version"],
+                    a["input_tokens"],
+                    a["output_tokens"],
+                    a["seconds"],
+                ],
+            )
+        ).fetchone()
+        return row["id"]
+
+
+async def copilot_history(pool: AsyncConnectionPool, case_id: str) -> list[dict]:
+    async with pool.connection() as conn:
+        return await (
+            await conn.execute(
+                "SELECT id, question, answer, tools, cited, unverified, created_at "
+                "FROM copilot_messages WHERE case_id = %s ORDER BY id",
+                [case_id],
+            )
+        ).fetchall()
 
 
 async def get_case(pool: AsyncConnectionPool, case_id: str) -> dict | None:
@@ -316,7 +378,7 @@ async def get_case(pool: AsyncConnectionPool, case_id: str) -> dict | None:
             return None
         case["decisions"] = await (
             await conn.execute(
-                "SELECT action, reason, reviewer, decided_at, applied_at FROM decisions "
+                "SELECT action, reason, reviewer, role, decided_at, applied_at FROM decisions "
                 "WHERE case_id = %s ORDER BY decision_id",
                 [case_id],
             )
@@ -347,18 +409,46 @@ async def list_cases(pool: AsyncConnectionPool, status: str | None = None) -> li
 
 
 async def record_decision(pool: AsyncConnectionPool, case_id: str, decision: Decision) -> None:
-    """Record a human decision. Only a case waiting for review accepts one."""
+    """Record a human decision, enforcing who may decide what.
+
+    A case ready for review takes an analyst outcome (close, escalate, request_more).
+    An escalation then waits for a supervisor (four-eyes rule): only a reviewer with the
+    supervisor role who is not the person who escalated may confirm or return it.
+    """
     async with pool.connection() as conn, conn.transaction():
         row = await (
             await conn.execute("SELECT status FROM cases WHERE case_id = %s FOR UPDATE", [case_id])
         ).fetchone()
         if row is None:
             raise KeyError(case_id)
-        if row["status"] != "pending_review":
-            raise CaseStateError(f"case is {row['status']}, not pending_review")
+        status = row["status"]
+        if status == "pending_review":
+            if decision.action not in ANALYST_ACTIONS:
+                raise CaseStateError(f"{decision.action} is not allowed on a case ready for review")
+        elif status == "pending_approval":
+            if decision.action not in SUPERVISOR_ACTIONS:
+                raise CaseStateError(
+                    "the case awaits a supervisor: confirm or return the escalation"
+                )
+            if decision.role != "supervisor":
+                raise CaseStateError("four-eyes rule: only a supervisor can confirm an escalation")
+            escalated_by = await (
+                await conn.execute(
+                    "SELECT reviewer FROM decisions WHERE case_id = %s AND action = 'escalate' "
+                    "ORDER BY decision_id DESC LIMIT 1",
+                    [case_id],
+                )
+            ).fetchone()
+            if escalated_by and escalated_by["reviewer"] == decision.reviewer:
+                raise CaseStateError(
+                    "four-eyes rule: the escalation must be confirmed by a different person"
+                )
+        else:
+            raise CaseStateError(f"case is {status}; it is not waiting for a decision")
         await conn.execute(
-            "INSERT INTO decisions (case_id, action, reason, reviewer) VALUES (%s, %s, %s, %s)",
-            [case_id, decision.action, decision.reason, decision.reviewer],
+            "INSERT INTO decisions (case_id, action, reason, reviewer, role) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            [case_id, decision.action, decision.reason, decision.reviewer, decision.role],
         )
         await conn.execute(
             "UPDATE cases SET status = 'decision_recorded', run_phase = 'resume', "
@@ -398,7 +488,7 @@ async def next_decision(pool: AsyncConnectionPool, case_id: str) -> dict | None:
     async with pool.connection() as conn:
         return await (
             await conn.execute(
-                "SELECT decision_id, action, reason, reviewer, decided_at FROM decisions "
+                "SELECT decision_id, action, reason, reviewer, role, decided_at FROM decisions "
                 "WHERE case_id = %s AND applied_at IS NULL ORDER BY decision_id LIMIT 1",
                 [case_id],
             )
@@ -474,6 +564,35 @@ async def stats(pool: AsyncConnectionPool) -> dict:
         "decisions": {r["action"]: r["n"] for r in decisions},
         "verification": verified,
     }
+
+
+async def requeue_case(pool: AsyncConnectionPool, case_id: str) -> None:
+    """Put a claimed case back in the queue (its worker lost the tool connection)."""
+    async with pool.connection() as conn:
+        await conn.execute(
+            "UPDATE cases SET status = CASE WHEN run_phase = 'resume' THEN 'decision_recorded' "
+            "ELSE 'queued' END, claimed_by = NULL, claimed_at = NULL, updated_at = now() "
+            "WHERE case_id = %s AND status = 'running'",
+            [case_id],
+        )
+
+
+async def retry_failed(pool: AsyncConnectionPool, case_id: str) -> None:
+    """Queue a failed case again; it resumes from its last checkpoint."""
+    async with pool.connection() as conn, conn.transaction():
+        row = await (
+            await conn.execute("SELECT status FROM cases WHERE case_id = %s FOR UPDATE", [case_id])
+        ).fetchone()
+        if row is None:
+            raise KeyError(case_id)
+        if row["status"] != "failed":
+            raise CaseStateError(f"case is {row['status']}; only a failed review can be retried")
+        await conn.execute(
+            "UPDATE cases SET status = CASE WHEN run_phase = 'resume' THEN 'decision_recorded' "
+            "ELSE 'queued' END, error = NULL, claimed_by = NULL, claimed_at = NULL, "
+            "updated_at = now() WHERE case_id = %s",
+            [case_id],
+        )
 
 
 async def mark_failed(pool: AsyncConnectionPool, case_id: str, error: str) -> None:

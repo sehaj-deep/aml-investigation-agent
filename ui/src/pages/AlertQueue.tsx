@@ -14,8 +14,9 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'New', value: 'new' },
   { label: 'Ready for review', value: 'pending_review' },
   { label: 'AI review in progress', value: 'running' },
-  { label: 'Closed: AI accepted', value: 'approved' },
-  { label: 'Closed: AI overridden', value: 'rejected' },
+  { label: 'Awaiting supervisor approval', value: 'pending_approval' },
+  { label: 'Closed: false alarm', value: 'closed' },
+  { label: 'Escalated for SAR review', value: 'escalated' },
   { label: 'All alerts', value: '' },
 ]
 

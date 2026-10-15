@@ -6,6 +6,9 @@
 - Tools show payment format and every date by default, as an analyst sees them.
 - Alert policy: the threshold catches 84% of laundering accounts in validation at an industry-typical false-alarm rate; on test, 89.4% of laundering accounts are alerted (31,518 alerts, 93.8% false, in high, medium and low priority bands). Below-the-line testing: a random sample of 250 accounts just under the threshold is reviewed to measure misses.
 - One alert queue (Postgres, paged): every alert shows its priority, reasons and flagged payments before it is opened; opening it starts the AI review, and the code-built evidence appears within seconds.
+- Analyst outcomes (close as false alarm, escalate for SAR review, needs more information) and a supervisor step for escalations; the four-eyes rule is enforced by the API and the workflow (decision 0015).
+- Investigator copilot: a chat panel on the case screen that answers questions with the same read-only tools, streams its lookups, checks every cited transaction and records everything in the audit log (decision 0016).
+- Reliability: if the tool server connection drops, the worker requeues the case, reconnects and resumes from the last checkpoint instead of failing it; a failed review can be retried from the case screen.
 - Plain-language case screen and history; model and instruction versions only on the Governance page. Prompt p8 reads why the alert was raised.
 - Decision records 0012 (first, account-level version), 0013 and 0014; scorecard part A updated.
 

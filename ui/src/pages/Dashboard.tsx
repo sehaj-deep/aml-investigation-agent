@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Card, Col, Progress, Row, Space, Statistic, Typography } from 'antd'
 import { api } from '../api'
-import { PRIORITY, RECOMMENDATION, typologyName } from '../terms'
+import { DECISION_LABEL, PRIORITY, RECOMMENDATION, typologyName } from '../terms'
 import { statusText } from '../components/badges'
 
 function Breakdown({
@@ -41,7 +41,7 @@ export default function Dashboard() {
   const s = data
   const total = s ? Object.values(s.by_status).reduce((a, b) => a + b, 0) : 0
   const open = s
-    ? total - (s.by_status.approved ?? 0) - (s.by_status.rejected ?? 0)
+    ? total - (s.by_status.closed ?? 0) - (s.by_status.escalated ?? 0)
     : 0
   return (
     <div className="page">
@@ -115,7 +115,7 @@ export default function Dashboard() {
             <Breakdown
               title="Analyst decisions"
               data={s?.decisions ?? {}}
-              label={(k) => ({ approve: 'Accepted', reject: 'Overridden', request_more: 'Returned' })[k] ?? k}
+              label={(k) => DECISION_LABEL[k as keyof typeof DECISION_LABEL] ?? k}
             />
           </Col>
         </Row>

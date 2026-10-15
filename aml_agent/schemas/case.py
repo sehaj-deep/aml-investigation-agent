@@ -86,8 +86,17 @@ class Case(_Strict):
     limitations: str
 
 
+# Analyst outcomes on a case ready for review, and the supervisor's answer to an
+# escalation (four-eyes rule: a second person, with the supervisor role, confirms).
+ANALYST_ACTIONS = ("close", "escalate", "request_more")
+SUPERVISOR_ACTIONS = ("confirm_escalation", "return_to_analyst")
+
+
 class Decision(_Strict):
-    action: Literal["approve", "reject", "request_more"]
+    action: Literal["close", "escalate", "request_more", "confirm_escalation", "return_to_analyst"]
     reason: str = Field(min_length=3, max_length=2000)
     reviewer: str = Field(min_length=1, max_length=100)
+    # Self-declared: there is no login (sandbox by design). The rule is enforced on the
+    # recorded names and roles and audited; it is a workflow control, not authentication.
+    role: Literal["analyst", "supervisor"] = "analyst"
     decided_at: datetime | None = None

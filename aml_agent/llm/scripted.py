@@ -82,8 +82,10 @@ class ScriptedProvider:
         self, messages: list[dict[str, Any]], tools: list[dict] | None = None
     ) -> ChatResponse:
         self.calls += 1
-        phase = _phase(messages)
-        if phase == "investigate":
+        phase = "copilot" if "investigation copilot" in messages[0]["content"] else _phase(messages)
+        if phase == "copilot":
+            resp = self._copilot(messages, tools)
+        elif phase == "investigate":
             resp = self._investigate(messages)
         elif phase == "hypothesize":
             resp = self._hypothesize(messages)
@@ -119,6 +121,19 @@ class ScriptedProvider:
         if n_tool == 1:
             return self._call("trace_funds", {**seed, "direction": "forward", "hops": 2})
         return ChatResponse(content="Investigation complete.")
+
+    def _copilot(self, messages: list[dict], tools: list[dict] | None) -> ChatResponse:
+        alert = _alert(messages)
+        asked = max(i for i, m in enumerate(messages) if m["role"] == "user")
+        looked = any(m["role"] == "tool" for m in messages[asked:])
+        if tools and not looked:
+            return self._call(
+                "get_account_summary",
+                {"bank_id": alert["seed_bank"], "account": alert["seed_account"]},
+            )
+        cite = re.search(r"\btx (\d+)", messages[1]["content"])
+        ref = f" (tx {cite.group(1)})" if cite else ""
+        return ChatResponse(content=f"Scripted copilot answer: the subject was looked up{ref}.")
 
     def _hypothesize(self, messages: list[dict]) -> ChatResponse:
         if self.policy == "bad_json" and not self._bad_json_sent:

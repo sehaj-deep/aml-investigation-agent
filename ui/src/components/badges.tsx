@@ -9,8 +9,9 @@ const STATUS: Record<WorkStatus, { color: string; text: string }> = {
   running: { color: 'processing', text: 'AI review in progress' },
   pending_review: { color: 'orange', text: 'Ready for review' },
   decision_recorded: { color: 'processing', text: 'Applying decision' },
-  approved: { color: 'blue', text: 'Closed: AI recommendation accepted' },
-  rejected: { color: 'purple', text: 'Closed: AI recommendation overridden' },
+  pending_approval: { color: 'gold', text: 'Awaiting supervisor approval' },
+  closed: { color: 'green', text: 'Closed: false alarm' },
+  escalated: { color: 'volcano', text: 'Escalated for SAR review' },
   failed: { color: 'magenta', text: 'AI review failed' },
 }
 

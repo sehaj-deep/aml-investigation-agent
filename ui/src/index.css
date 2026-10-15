@@ -33,3 +33,22 @@ body {
   border: 1px solid #e3e8ef;
   border-radius: 3px;
 }
+
+.copilot-q {
+  background: #1d4e89;
+  color: #fff;
+  border-radius: 8px 8px 2px 8px;
+  padding: 6px 10px;
+  margin-left: 40px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.copilot-a {
+  background: #f3f5f8;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px 8px 8px 2px;
+  padding: 8px 10px;
+  margin-right: 24px;
+  font-size: 13px;
+}

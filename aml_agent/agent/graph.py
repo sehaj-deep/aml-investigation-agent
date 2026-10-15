@@ -3,8 +3,10 @@
     triage -> agent <-> tools -> hypothesize -> collect_evidence -> draft -> verify
                 ^                                                            |
                 +-- request_more <-- human_review <--------------------------+
-                                          |
-                                          +--> finalize
+                                       |      ^
+                              close    |      | return_to_analyst
+                                 v     v      |
+                          finalize <-- supervisor_review  (escalate: four-eyes)
 
 - triage (code): builds the case file through MCP (aml_agent/agent/casefile.py):
   the seed's summary, its two-step neighborhood and loops through the seed.
@@ -18,8 +20,11 @@
   JSON replies are validated with Pydantic, one retry each.
 - verify (code): checks every cited tx_id and evidence row against the data
   (FR-7); failures become visible warnings before review.
-- human_review: LangGraph interrupt. Resumes only with a validated Decision.
-- finalize: refuses to run without an approve or reject decision.
+- human_review: LangGraph interrupt. Resumes only with a validated analyst Decision:
+  close, escalate or request_more.
+- supervisor_review: a second interrupt for escalations. Only a supervisor who is not the
+  escalating reviewer may confirm or return it (also enforced by the API).
+- finalize: refuses to run without a close or a confirmed escalation.
 State is checkpointed after every node (thread_id = case_id), so a paused case
 survives a restart. Every node, model call and tool call is written to the audit
 log and traced (aml_agent/instrument.py).
@@ -45,7 +50,15 @@ from aml_agent.instrument import (
     audited_node,
 )
 from aml_agent.llm.base import ChatProvider
-from aml_agent.schemas.case import Case, Decision, DraftReply, Evidence, HypothesisReply
+from aml_agent.schemas.case import (
+    ANALYST_ACTIONS,
+    SUPERVISOR_ACTIONS,
+    Case,
+    Decision,
+    DraftReply,
+    Evidence,
+    HypothesisReply,
+)
 from aml_agent.tools.client import GraphClient
 
 EM_DASH = chr(0x2014)
@@ -62,7 +75,11 @@ class Budget:
 
 
 class FinalizeRefused(RuntimeError):
-    """Raised when finalize is reached without a recorded approve or reject decision."""
+    """Raised when finalize is reached without a close or a confirmed escalation."""
+
+
+class FourEyesViolation(RuntimeError):
+    """Raised when an escalation is confirmed by a non-supervisor or by the escalator."""
 
 
 class CaseState(TypedDict, total=False):
@@ -81,6 +98,7 @@ class CaseState(TypedDict, total=False):
     candidates: list[dict]
     risk: dict
     triggers: list[dict]
+    case_file: str
     steps: int
     tool_calls: int
     round_steps: int
@@ -100,6 +118,7 @@ class CaseState(TypedDict, total=False):
     decisions: list[dict]
     review_round: int
     next_after_review: str
+    next_after_supervisor: str
     status: str
 
 
@@ -182,6 +201,7 @@ def build_graph(
             "candidates": case_file.candidates,
             "risk": case_file.risk,
             "triggers": case_file.triggers,
+            "case_file": case_file.text,
             "evidence_rows": [],
             "steps": 0,
             "tool_calls": 0,
@@ -512,14 +532,18 @@ def build_graph(
             }
         )
         decision = Decision.model_validate(raw)
+        if decision.action not in ANALYST_ACTIONS:
+            raise ValueError(f"{decision.action} is not an analyst decision")
         decisions = [*state["decisions"], decision.model_dump(mode="json")]
-        if decision.action != "request_more":
+        if decision.action == "close":
             return {"decisions": decisions, "next_after_review": "finalize"}
+        if decision.action == "escalate":
+            return {"decisions": decisions, "next_after_review": "supervisor_review"}
         if state["review_round"] >= budget.max_review_rounds:
             warnings = [
                 *state["warnings"],
                 "more investigation was requested but the review-round limit is reached; "
-                "approve or reject",
+                "close or escalate",
             ]
             return {
                 "decisions": decisions,
@@ -539,14 +563,32 @@ def build_graph(
             "next_after_review": "agent",
         }
 
+    async def supervisor_review(state: CaseState) -> CaseState:
+        raw = interrupt({"case_id": state["case_id"], "awaiting": "supervisor"})
+        decision = Decision.model_validate(raw)
+        escalator = next(
+            (d["reviewer"] for d in reversed(state["decisions"]) if d["action"] == "escalate"),
+            None,
+        )
+        if decision.action not in SUPERVISOR_ACTIONS:
+            raise ValueError(f"{decision.action} is not a supervisor decision")
+        if decision.role != "supervisor" or decision.reviewer == escalator:
+            raise FourEyesViolation(
+                f"case {state.get('case_id')}: an escalation needs a different supervisor"
+            )
+        decisions = [*state["decisions"], decision.model_dump(mode="json")]
+        if decision.action == "confirm_escalation":
+            return {"decisions": decisions, "next_after_supervisor": "finalize"}
+        return {"decisions": decisions, "next_after_supervisor": "human_review"}
+
     async def finalize(state: CaseState) -> CaseState:
         decisions = state.get("decisions") or []
         last = decisions[-1] if decisions else None
-        if not last or last["action"] not in ("approve", "reject"):
+        if not last or last["action"] not in ("close", "confirm_escalation"):
             raise FinalizeRefused(
-                f"case {state.get('case_id')}: finalize needs a recorded approve or reject"
+                f"case {state.get('case_id')}: finalize needs a close or a confirmed escalation"
             )
-        return {"status": "approved" if last["action"] == "approve" else "rejected"}
+        return {"status": "closed" if last["action"] == "close" else "escalated"}
 
     g = StateGraph(CaseState)
     nodes = {
@@ -558,6 +600,7 @@ def build_graph(
         "draft": draft,
         "verify": verify,
         "human_review": human_review,
+        "supervisor_review": supervisor_review,
         "finalize": finalize,
     }
     for name, fn in nodes.items():
@@ -573,7 +616,12 @@ def build_graph(
     g.add_conditional_edges(
         "human_review",
         lambda s: s["next_after_review"],
-        ["finalize", "agent", "human_review"],
+        ["finalize", "agent", "human_review", "supervisor_review"],
+    )
+    g.add_conditional_edges(
+        "supervisor_review",
+        lambda s: s["next_after_supervisor"],
+        ["finalize", "human_review"],
     )
     g.add_edge("finalize", END)
     return g, finalize

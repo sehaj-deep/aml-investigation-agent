@@ -5,8 +5,9 @@ export type CaseStatus =
   | 'running'
   | 'pending_review'
   | 'decision_recorded'
-  | 'approved'
-  | 'rejected'
+  | 'pending_approval'
+  | 'closed'
+  | 'escalated'
   | 'failed'
 
 export type Priority = 'high' | 'medium' | 'low' | 'sample'
@@ -50,6 +51,21 @@ export interface QueueAlert {
   recommended_action: string | null
   pattern: string | null
 }
+
+export interface CopilotAnswer {
+  id: number
+  question: string
+  answer: string
+  tools: { name: string; text: string; ok: boolean }[]
+  cited: number[]
+  unverified: number[]
+  created_at: string
+}
+
+export type CopilotEvent =
+  | { type: 'tool'; name: string; text: string; ok: boolean }
+  | ({ type: 'answer' } & CopilotAnswer)
+  | { type: 'error'; message: string }
 
 export interface AlertSummary {
   total: number
@@ -159,9 +175,10 @@ export interface Verification {
 }
 
 export interface Decision {
-  action: 'approve' | 'reject' | 'request_more'
+  action: 'close' | 'escalate' | 'request_more' | 'confirm_escalation' | 'return_to_analyst'
   reason: string
   reviewer: string
+  role: 'analyst' | 'supervisor'
   decided_at: string
   applied_at: string | null
 }
@@ -190,6 +207,7 @@ export interface CaseDetail {
     aliases: Record<string, [number, string]>
     risk?: CaseRisk | null
     triggers?: Trigger[]
+    case_file?: string
   } | null
   error: string | null
   provider: string | null
@@ -230,6 +248,34 @@ export const api = {
     return request<{ total: number; items: QueueAlert[] }>(`/alerts?${qs}`)
   },
   alertSummary: () => request<AlertSummary>('/alerts/summary'),
+  copilotHistory: (id: string) =>
+    request<{ answers: CopilotAnswer[]; used: number; limit: number }>(`/cases/${id}/copilot`),
+  // Streams the copilot's steps (server-sent events), then its answer.
+  askCopilot: async (id: string, question: string, onEvent: (e: CopilotEvent) => void) => {
+    const res = await fetch(`/api/cases/${id}/copilot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    })
+    if (!res.ok || !res.body) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(typeof body.detail === 'string' ? body.detail : `copilot failed (${res.status})`)
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const chunks = buffer.split('\n\n')
+      buffer = chunks.pop() ?? ''
+      for (const chunk of chunks) {
+        const line = chunk.split('\n').find((l) => l.startsWith('data: '))
+        if (line) onEvent(JSON.parse(line.slice(6)) as CopilotEvent)
+      }
+    }
+  },
   openAlert: (alertId: string) =>
     request<{ case_id: string; created: boolean }>(`/alerts/${alertId}/open`, { method: 'POST' }),
   cases: () => request<CaseRow[]>('/cases'),
@@ -242,9 +288,10 @@ export const api = {
       events: { seq: number; event_type: string; actor: string; created_at: string; payload: Record<string, unknown> }[]
     }>(`/cases/${id}/audit`),
   stats: () => request<Stats>('/stats'),
-  decide: (id: string, action: Decision['action'], reason: string, reviewer: string) =>
+  retry: (id: string) => request<{ status: string }>(`/cases/${id}/retry`, { method: 'POST' }),
+  decide: (id: string, action: Decision['action'], reason: string, reviewer: string, role: Decision['role']) =>
     request<{ status: string }>(`/cases/${id}/decision`, {
       method: 'POST',
-      body: JSON.stringify({ action, reason, reviewer }),
+      body: JSON.stringify({ action, reason, reviewer, role }),
     }),
 }

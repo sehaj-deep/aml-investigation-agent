@@ -45,8 +45,15 @@ def run_case(tmp_path_factory):
             await app.ainvoke({"case_id": "case-audit", "alert": ALERT}, cfg)
             more = {"action": "request_more", "reason": "Check inbound.", "reviewer": "r1"}
             await app.ainvoke(Command(resume=more), cfg)
-            approve = {"action": "approve", "reason": "Supported.", "reviewer": "r1"}
-            await app.ainvoke(Command(resume=approve), cfg)
+            escalate = {"action": "escalate", "reason": "Supported.", "reviewer": "r1"}
+            await app.ainvoke(Command(resume=escalate), cfg)
+            confirm = {
+                "action": "confirm_escalation",
+                "reason": "Agreed.",
+                "reviewer": "s1",
+                "role": "supervisor",
+            }
+            await app.ainvoke(Command(resume=confirm), cfg)
             return (await app.aget_state(cfg)).values
 
     values = asyncio.run(main())
@@ -57,7 +64,7 @@ def test_case_rebuilt_from_log_equals_live_run(run_case):
     values, events = run_case
     rebuilt = reconstruct(events)
     assert rebuilt == values
-    assert rebuilt["status"] == "approved"
+    assert rebuilt["status"] == "escalated"
 
 
 def test_hash_chain_is_valid_and_detects_tampering(run_case):
@@ -87,7 +94,8 @@ def test_every_model_and_tool_call_is_recorded(run_case):
 def test_decisions_and_interrupts_are_recorded(run_case):
     _, events = run_case
     types = [e["event_type"] for e in events]
-    assert types.count("node_interrupted") == 2
+    # Two analyst reviews (request_more, then escalate) and the supervisor's confirmation.
+    assert types.count("node_interrupted") == 3
     finished = [e["payload"]["node"] for e in events if e["event_type"] == "node_finished"]
     assert finished[-1] == "finalize"
     assert finished.count("human_review") == 2

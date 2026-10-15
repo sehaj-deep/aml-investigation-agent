@@ -11,18 +11,23 @@ finalizes, and only after a decision recorded here.
 
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, model_validator
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from aml_agent import store
+from aml_agent.agent import copilot
 from aml_agent.alerts.io import read_alerts, read_queue
 from aml_agent.alerts.models import Alert
 from aml_agent.audit import PostgresAudit, timeline, verify_chain
+from aml_agent.llm.base import get_provider
 from aml_agent.schemas.case import Decision
+from aml_agent.tools.client import connect_graph
 
 log = logging.getLogger("aml_agent.api")
 
@@ -39,6 +44,12 @@ class NewCase(BaseModel):
         if (self.alert_id is None) == (self.alert is None):
             raise ValueError("give exactly one of alert_id or alert")
         return self
+
+
+class Question(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=3, max_length=1000)
 
 
 def create_app(pool=None) -> FastAPI:
@@ -142,6 +153,65 @@ def create_app(pool=None) -> FastAPI:
             case_id, "decision_recorded", decision.model_dump(mode="json"), actor="api"
         )
         return {"case_id": case_id, "status": "decision_recorded"}
+
+    @app.post("/cases/{case_id}/retry")
+    async def retry(case_id: str) -> dict:
+        """Run a failed AI review again, from its last checkpoint."""
+        try:
+            await store.retry_failed(app.state.pool, case_id)
+        except KeyError:
+            raise HTTPException(404, "no such case") from None
+        except store.CaseStateError as exc:
+            raise HTTPException(409, str(exc)) from None
+        await app.state.audit.emit(case_id, "retry_requested", {}, actor="analyst")
+        return {"case_id": case_id, "status": "queued"}
+
+    @app.get("/cases/{case_id}/copilot")
+    async def copilot_history(case_id: str) -> dict:
+        answers = await store.copilot_history(app.state.pool, case_id)
+        return {"answers": answers, "used": len(answers), "limit": copilot.MAX_QUESTIONS}
+
+    @app.post("/cases/{case_id}/copilot")
+    async def ask_copilot(case_id: str, body: Question) -> StreamingResponse:
+        """Answer an analyst's question about the case, streamed as server-sent events:
+        one event per data lookup, then the answer. The copilot cannot change a case."""
+        case = await store.get_case(app.state.pool, case_id)
+        if case is None:
+            raise HTTPException(404, "no such case")
+        if not (case.get("analysis") or {}).get("case_file"):
+            raise HTTPException(409, "the copilot is available once the case file is ready")
+        history = await store.copilot_history(app.state.pool, case_id)
+        if len(history) >= copilot.MAX_QUESTIONS:
+            raise HTTPException(429, f"question limit reached ({copilot.MAX_QUESTIONS} per case)")
+        if getattr(app.state, "copilot_provider", None) is None:
+            app.state.copilot_provider = get_provider()
+
+        async def events():
+            try:
+                async with connect_graph() as client:
+                    async for event in copilot.ask(
+                        app.state.copilot_provider,
+                        client,
+                        case,
+                        body.question,
+                        history,
+                        app.state.audit,
+                    ):
+                        if event["type"] == "answer":
+                            event["id"] = await store.save_copilot_answer(
+                                app.state.pool, case_id, event
+                            )
+                        yield f"data: {json.dumps(event, default=str)}\n\n"
+            except Exception as exc:  # report, do not drop the stream silently
+                log.exception("copilot failed for %s", case_id)
+                error = {"type": "error", "message": f"The copilot failed: {type(exc).__name__}"}
+                yield f"data: {json.dumps(error)}\n\n"
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.get("/cases/{case_id}/audit")
     async def audit_events(case_id: str) -> dict:

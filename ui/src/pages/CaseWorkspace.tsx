@@ -28,6 +28,7 @@ import dayjs from 'dayjs'
 import { api, type CaseDetail, type Decision, type Evidence, type Trigger } from '../api'
 import { ActionTag, PatternTag, PriorityTag, StatusTag, VerifiedBadge, statusText } from '../components/badges'
 import NetworkGraph from '../components/NetworkGraph'
+import CopilotPanel from '../components/CopilotPanel'
 import { useUser } from '../user'
 import { DECISION_LABEL, DECISION_PAST, RISK_RULES, factorText, typologyName } from '../terms'
 
@@ -88,6 +89,8 @@ export default function CaseWorkspace() {
   })
   const labels = useLabels(c)
   const [highlightId, setHighlightId] = useState<string>('flagged')
+  const [activeTab, setActiveTab] = useState('flagged')
+  const [copilotTx, setCopilotTx] = useState<Set<number>>(new Set())
 
   const triggers = useMemo(() => c?.analysis?.triggers ?? [], [c])
   const candidates = useMemo(() => c?.analysis?.candidates ?? [], [c])
@@ -102,9 +105,19 @@ export default function CaseWorkspace() {
     if (highlightId === 'flagged') triggers.forEach((t) => (add(t.from_bank, t.from_account), add(t.to_bank, t.to_account)))
     else if (highlightId === 'evidence')
       c.draft?.evidence.forEach((e) => (add(e.from_bank, e.from_account), add(e.to_bank, e.to_account)))
+    else if (highlightId === 'copilot') {
+      // Accounts on either side of the transactions the copilot cited.
+      triggers.filter((t) => copilotTx.has(t.tx_id)).forEach((t) => (add(t.from_bank, t.from_account), add(t.to_bank, t.to_account)))
+      c.draft?.evidence
+        .filter((e) => copilotTx.has(e.tx_id))
+        .forEach((e) => (add(e.from_bank, e.from_account), add(e.to_bank, e.to_account)))
+      c.case_graph?.edges
+        .filter((e) => e.tx_ids.some((t) => copilotTx.has(t)))
+        .forEach((e) => (s.add(e.src), s.add(e.dst)))
+    }
     else candidates.find((x) => x.id === highlightId)?.accounts.forEach((a) => s.add(a))
     return s
-  }, [c, highlightId, labels, triggers, candidates])
+  }, [c, highlightId, labels, triggers, candidates, copilotTx])
 
   if (isLoading) return <Spin style={{ margin: 48 }} />
   if (error || !c)
@@ -143,6 +156,15 @@ export default function CaseWorkspace() {
                 <span className="mono">{c.case_id}</span>
               </Descriptions.Item>
             </Descriptions>
+            <CopilotPanel
+              caseId={c.case_id}
+              ready={!!c.analysis?.case_file}
+              onCite={(ids) => {
+                setCopilotTx(new Set(ids))
+                setHighlightId('copilot')
+                setActiveTab('network')
+              }}
+            />
           </Space>
         </Card>
 
@@ -154,15 +176,15 @@ export default function CaseWorkspace() {
             description="The flagged payments, network and red flags are ready to look at now. The AI assessment appears on the right when it is done."
           />
         )}
-        {c.status === 'failed' && (
-          <Alert type="error" showIcon message="The AI review failed" description={c.error} />
-        )}
+        {c.status === 'failed' && <FailedNotice c={c} />}
 
         <Row gutter={12}>
           <Col xs={24} xl={15}>
             <Card size="small">
               <Tabs
                 size="small"
+                activeKey={activeTab}
+                onChange={setActiveTab}
                 items={[
                   {
                     key: 'flagged',
@@ -184,6 +206,9 @@ export default function CaseWorkspace() {
                             options={[
                               { value: 'flagged', label: 'Accounts in the flagged payments' },
                               { value: 'evidence', label: 'Accounts in the supporting transactions' },
+                              ...(copilotTx.size
+                                ? [{ value: 'copilot', label: "Accounts in the copilot's cited transactions" }]
+                                : []),
                               ...candidates.map((x, i) => ({
                                 value: x.id,
                                 label: `Pattern ${i + 1}: ${typologyName(x.kind)} (${x.accounts.length} accounts)`,
@@ -265,12 +290,49 @@ export default function CaseWorkspace() {
               <WhyCard c={c} />
               <RedFlagsCard c={c} />
               <AssessmentCard c={c} />
-              <DecisionCard c={c} />
+              <DecisionCard key={c.status} c={c} />
             </Space>
           </Col>
         </Row>
       </Space>
     </div>
+  )
+}
+
+function FailedNotice({ c }: { c: CaseDetail }) {
+  const { message } = App.useApp()
+  const queryClient = useQueryClient()
+  const retry = useMutation({
+    mutationFn: () => api.retry(c.case_id),
+    onSuccess: () => {
+      message.success('The AI review was restarted')
+      queryClient.invalidateQueries({ queryKey: ['case', c.case_id] })
+      queryClient.invalidateQueries({ queryKey: ['alerts'] })
+    },
+    onError: (e) => message.error(String(e)),
+  })
+  return (
+    <Alert
+      type="error"
+      showIcon
+      message="The AI review could not finish"
+      description={
+        <Space direction="vertical" size={4}>
+          <span>
+            The evidence gathered so far is kept. Retry the review; it continues from where it
+            stopped. If it fails again, the technical detail below helps support.
+          </span>
+          <Typography.Text type="secondary" className="mono" style={{ fontSize: 11 }}>
+            {c.error}
+          </Typography.Text>
+        </Space>
+      }
+      action={
+        <Button type="primary" danger loading={retry.isPending} onClick={() => retry.mutate()}>
+          Retry the AI review
+        </Button>
+      }
+    />
   )
 }
 
@@ -444,26 +506,36 @@ function AssessmentCard({ c }: { c: CaseDetail }) {
   )
 }
 
+const ANALYST_OPTIONS = ['close', 'escalate', 'request_more'] as const
+const SUPERVISOR_OPTIONS = ['confirm_escalation', 'return_to_analyst'] as const
+
 function DecisionCard({ c }: { c: CaseDetail }) {
   const user = useUser()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
-  const [action, setAction] = useState<Decision['action']>('approve')
+  const awaiting = c.status === 'pending_approval'
+  const [action, setAction] = useState<Decision['action'] | null>(null)
   const [reason, setReason] = useState('')
   const decide = useMutation({
-    mutationFn: () => api.decide(c.case_id, action, reason, user.name),
+    mutationFn: () => api.decide(c.case_id, action!, reason, user.name, user.role),
     onSuccess: () => {
       message.success('Decision recorded')
       setReason('')
+      setAction(null)
       queryClient.invalidateQueries({ queryKey: ['case', c.case_id] })
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
     },
     onError: (e) => message.error(String(e)),
   })
 
-  const escalation = action === 'approve' && c.draft?.recommended_action === 'escalate'
-  const needsSupervisor = escalation && user.role !== 'supervisor'
-  const canDecide = c.status === 'pending_review'
+  const ai = c.draft?.recommended_action
+  const escalator = [...c.decisions].reverse().find((d) => d.action === 'escalate')?.reviewer
+  // The server enforces the four-eyes rule; the screen explains it before you try.
+  const blocked = awaiting && (user.role !== 'supervisor' || escalator === user.name)
+  const canDecide = c.status === 'pending_review' || awaiting
+  const options = awaiting ? SUPERVISOR_OPTIONS : ANALYST_OPTIONS
+  const agrees =
+    action === 'close' ? ai === 'close' : action === 'escalate' ? ai === 'escalate' : null
 
   return (
     <Card size="small" title={<span className="panel-title">Your decision</span>}>
@@ -488,27 +560,44 @@ function DecisionCard({ c }: { c: CaseDetail }) {
         )}
         {canDecide ? (
           <>
+            {awaiting ? (
+              <Alert
+                type={blocked ? 'warning' : 'info'}
+                showIcon
+                icon={<LockOutlined />}
+                message="This escalation needs a supervisor's approval (four-eyes rule)."
+                description={
+                  blocked
+                    ? 'A supervisor other than the person who escalated must confirm or return it. Switch to the Supervisor role at the top right.'
+                    : 'Confirm the escalation, or return it to the analyst with a reason.'
+                }
+              />
+            ) : (
+              <Space wrap>
+                <span>AI recommendation</span>
+                <ActionTag action={ai} />
+              </Space>
+            )}
             <Radio.Group
               value={action}
               onChange={(e) => setAction(e.target.value)}
               optionType="button"
-              options={[
-                { value: 'approve', label: DECISION_LABEL.approve },
-                { value: 'reject', label: DECISION_LABEL.reject },
-                { value: 'request_more', label: DECISION_LABEL.request_more },
-              ]}
+              disabled={blocked}
+              options={options.map((o) => ({ value: o, label: DECISION_LABEL[o] }))}
             />
-            {escalation && (
-              <Alert
-                type={needsSupervisor ? 'warning' : 'info'}
-                showIcon
-                icon={<LockOutlined />}
-                message="Escalations need a supervisor's approval (four-eyes rule)."
-                description="Switch to the Supervisor role at the top right to accept an escalation."
-              />
+            {agrees !== null && (
+              <Typography.Text type="secondary">
+                {agrees ? 'This agrees with the AI recommendation.' : 'This differs from the AI recommendation.'}
+              </Typography.Text>
+            )}
+            {action === 'escalate' && (
+              <Typography.Text type="secondary">
+                A supervisor will confirm the escalation before the case closes.
+              </Typography.Text>
             )}
             <Input.TextArea
               rows={3}
+              disabled={blocked}
               placeholder="Reason for your decision (required, kept in the case history)"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -516,7 +605,7 @@ function DecisionCard({ c }: { c: CaseDetail }) {
             <Button
               type="primary"
               block
-              disabled={reason.trim().length < 3 || needsSupervisor}
+              disabled={!action || reason.trim().length < 3 || blocked}
               loading={decide.isPending}
               onClick={() => decide.mutate()}
             >
@@ -528,7 +617,7 @@ function DecisionCard({ c }: { c: CaseDetail }) {
             {LIVE.has(c.status)
               ? 'You can decide once the AI review is done.'
               : c.status === 'failed'
-                ? 'The AI review failed; the case cannot be decided here.'
+                ? 'Retry the AI review (top of the page) before deciding.'
                 : 'This case is closed. Recorded decisions cannot be changed.'}
           </Typography.Text>
         )}
