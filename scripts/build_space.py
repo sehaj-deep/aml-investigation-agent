@@ -1,9 +1,10 @@
-"""Assemble the public demo (a Hugging Face Space) and optionally upload it.
+"""Assemble the public demo and optionally push it to its private deploy repository.
 
-    python scripts/build_space.py                    build into data/space only
-    python scripts/build_space.py --upload           build, then create or update the Space
+    python scripts/build_space.py              build into data/space only
+    python scripts/build_space.py --push       build, then push to the deploy repository
 
-The Space is one Docker container (deploy/space/). This script copies the code and the
+The demo is one Docker container (deploy/space/), hosted on Render's free web service,
+which builds it from a private GitHub repository. This script copies the code and the
 UI, and exports from the local stack:
 - the demo database: the reviewed cases with everything a visitor needs (alerts, case
   files, assessments, decisions, copilot answers, SAR drafts, audit log, workflow
@@ -11,8 +12,9 @@ UI, and exports from the local stack:
 - the data slice: every transaction touching an account that appears in a demo case
   (tool columns only, no laundering labels), under the dataset's CDLA-Sharing licence.
 
-The build folder is under data/ (gitignored): the data slice never goes to GitHub.
-Uploading uses the Hugging Face login stored on this machine (hf auth login).
+The build folder is under data/ (gitignored): the data slice never goes to the public
+repository. --push commits the build to the private deploy repository (DEPLOY_REPO) with
+the GitHub login already on this machine; the host rebuilds from it.
 """
 
 from __future__ import annotations
@@ -31,8 +33,8 @@ from aml_agent.data.tooldb import tool_db_path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "space"
-SPACE_ID = "sehajdeep490/aml-investigation-agent"
-HF = Path.home() / ".hf-cli" / "Scripts" / "hf.exe"
+DEPLOY_REPO = "https://github.com/sehaj-deep/aml-demo-deploy.git"
+DEPLOY_DIR = ROOT / "data" / "deploy-repo"
 SKIP = {"__pycache__", "node_modules", "dist", ".vite"}
 
 EXPORTS = {
@@ -113,19 +115,7 @@ def export_slice(accounts: set[tuple[int, str]], parquet: Path) -> int:
     return n
 
 
-SPACE_README = """---
-title: AML Investigation Agent
-emoji: 🔎
-colorFrom: indigo
-colorTo: gray
-sdk: docker
-app_port: 7860
-pinned: false
-license: other
-short_description: AI-assisted AML case manager on synthetic data
----
-
-# AML Investigation Agent (public demo)
+DEMO_README = """# AML Investigation Agent (public demo)
 
 An AI-assisted anti-money-laundering case manager. Transaction monitoring raises alerts,
 an AI agent investigates them and recommends an action, and analysts decide under a
@@ -140,7 +130,7 @@ four-eyes rule. Code, results and design notes: https://github.com/sehaj-deep/am
 
 ## Data
 
-This Space contains a small slice of the IBM Transactions for Anti-Money Laundering
+This repository contains a small slice of the IBM Transactions for Anti-Money Laundering
 (AML) dataset, HI-Small (the transactions around the demo cases, without laundering
 labels). The dataset is published under the Community Data License Agreement, Sharing,
 Version 1.0; see `LICENSE-DATA.md`. Guidance passages are US government publications in
@@ -167,7 +157,7 @@ publications, which are works of the US federal government and in the public dom
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--upload", action="store_true", help="create or update the Space")
+    parser.add_argument("--push", action="store_true", help="push to the deploy repository")
     args = parser.parse_args()
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -193,7 +183,7 @@ def main() -> None:
     for name in ("start.sh", "nginx.conf", "seed.py"):
         shutil.copy(ROOT / "deploy" / "space" / name, OUT / "space" / name)
     shutil.copy(ROOT / "deploy" / "space" / "Dockerfile", OUT / "Dockerfile")
-    (OUT / "README.md").write_text(SPACE_README, encoding="utf-8", newline="\n")
+    (OUT / "README.md").write_text(DEMO_README, encoding="utf-8", newline="\n")
     (OUT / "LICENSE-DATA.md").write_text(LICENSE_DATA, encoding="utf-8", newline="\n")
 
     size = sum(p.stat().st_size for p in OUT.rglob("*") if p.is_file()) / 1e6
@@ -209,37 +199,35 @@ def main() -> None:
             indent=1,
         )
     )
-    if args.upload:
-        subprocess.run(
-            [
-                str(HF),
-                "repos",
-                "create",
-                SPACE_ID,
-                "--type",
-                "space",
-                "--space-sdk",
-                "docker",
-                "--public",
-                "--exist-ok",
-            ],
-            check=True,
-        )
-        subprocess.run(
-            [
-                str(HF),
-                "upload",
-                SPACE_ID,
-                str(OUT),
-                ".",
-                "--repo-type",
-                "space",
-                "--commit-message",
-                "Update the demo",
-            ],
-            check=True,
-        )
-        print(f"uploaded: https://huggingface.co/spaces/{SPACE_ID}")
+    if args.push:
+        push(OUT)
+
+
+def git(*args: str, cwd: Path) -> str:
+    out = subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+    return out.stdout.strip()
+
+
+def push(build: Path) -> None:
+    """Mirror the build into a clone of the deploy repository, commit and push."""
+    if not (DEPLOY_DIR / ".git").exists():
+        DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
+        git("init", "-b", "main", cwd=DEPLOY_DIR)
+        git("remote", "add", "origin", DEPLOY_REPO, cwd=DEPLOY_DIR)
+    for item in DEPLOY_DIR.iterdir():
+        if item.name != ".git":
+            shutil.rmtree(item) if item.is_dir() else item.unlink()
+    shutil.copytree(build, DEPLOY_DIR, dirs_exist_ok=True)
+    (DEPLOY_DIR / ".gitattributes").write_text(
+        "* text=auto eol=lf\n*.duckdb binary\n*.parquet binary\n", encoding="utf-8"
+    )
+    git("add", "-A", cwd=DEPLOY_DIR)
+    if not git("status", "--porcelain", cwd=DEPLOY_DIR):
+        print("deploy repository already up to date")
+        return
+    git("commit", "-q", "-m", "Update the demo build", cwd=DEPLOY_DIR)
+    git("push", "-q", "-u", "origin", "main", cwd=DEPLOY_DIR)
+    print(f"pushed to {DEPLOY_REPO}; the host rebuilds from it")
 
 
 if __name__ == "__main__":

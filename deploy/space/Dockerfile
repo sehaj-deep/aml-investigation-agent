@@ -1,6 +1,7 @@
-# Public demo on a Hugging Face Space: the whole stack in one container (free CPU tier).
-# Built by scripts/build_space.py, which assembles this folder with the code, the data
-# slice and the demo database, and uploads it.
+# Public demo: the whole stack in one container, for a free container host (Render's
+# free web service; also runs on Hugging Face Spaces or Cloud Run). Built by
+# scripts/build_space.py, which assembles this folder with the code, the data slice and
+# the demo database.
 
 FROM node:22.12-alpine AS ui
 WORKDIR /ui
