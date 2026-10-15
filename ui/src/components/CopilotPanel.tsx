@@ -70,6 +70,7 @@ export default function CopilotPanel({
     queryFn: () => api.copilotHistory(caseId),
     enabled: open,
   })
+  const { data: demo } = useQuery({ queryKey: ['demo'], queryFn: api.demo, enabled: open })
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: 'smooth' })
@@ -92,6 +93,7 @@ export default function CopilotPanel({
       setAsking(null)
       queryClient.invalidateQueries({ queryKey: ['copilot', caseId] })
       queryClient.invalidateQueries({ queryKey: ['audit', caseId] })
+      queryClient.invalidateQueries({ queryKey: ['demo'] })
     }
   }
 
@@ -163,7 +165,11 @@ export default function CopilotPanel({
         />
         <Space style={{ marginTop: 8, justifyContent: 'space-between', width: '100%' }}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {data ? `${data.used} of ${data.limit} questions used` : ''}
+            {demo?.demo
+              ? `${demo.left?.copilot ?? 0} demo question(s) left today`
+              : data
+                ? `${data.used} of ${data.limit} questions used`
+                : ''}
           </Typography.Text>
           <Button type="primary" onClick={() => ask(question)} loading={!!asking} disabled={!question.trim()}>
             Ask

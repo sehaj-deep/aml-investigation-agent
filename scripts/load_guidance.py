@@ -17,52 +17,14 @@ import time
 from pathlib import Path
 
 import psycopg
-from psycopg import sql
 
 from aml_agent import store
-from aml_agent.guidance.search import EMBED_DIM, embed, vector_literal
+from aml_agent.guidance.schema import SCHEMA, reader_role
+from aml_agent.guidance.search import embed, vector_literal
 
 ROOT = Path(__file__).resolve().parents[1]
 PASSAGES = ROOT / "guidance" / "passages.jsonl"
 BATCH = 32
-
-SCHEMA = f"""
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE SCHEMA IF NOT EXISTS guidance;
-CREATE TABLE IF NOT EXISTS guidance.passages (
-    id           TEXT PRIMARY KEY,
-    doc_id       TEXT NOT NULL,
-    title        TEXT NOT NULL,
-    publisher    TEXT NOT NULL,
-    url          TEXT NOT NULL,
-    jurisdiction TEXT NOT NULL,
-    page         INTEGER,
-    section      TEXT,
-    text         TEXT NOT NULL,
-    tsv          tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED,
-    embedding    vector({EMBED_DIM}) NOT NULL
-);
-CREATE INDEX IF NOT EXISTS passages_tsv_idx ON guidance.passages USING gin (tsv);
-CREATE INDEX IF NOT EXISTS passages_vec_idx ON guidance.passages
-    USING hnsw (embedding vector_cosine_ops);
-"""
-
-
-def reader_role(conn: psycopg.Connection, password: str) -> None:
-    exists = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = 'guidance_reader'").fetchone()
-    verb = "ALTER" if exists else "CREATE"
-    conn.execute(
-        sql.SQL("{} ROLE guidance_reader LOGIN PASSWORD {}").format(
-            sql.SQL(verb), sql.Literal(password)
-        )
-    )
-    db = conn.execute("SELECT current_database()").fetchone()[0]
-    conn.execute(
-        sql.SQL("GRANT CONNECT ON DATABASE {} TO guidance_reader").format(sql.Identifier(db))
-    )
-    conn.execute("REVOKE ALL ON SCHEMA public FROM guidance_reader")
-    conn.execute("GRANT USAGE ON SCHEMA guidance TO guidance_reader")
-    conn.execute("GRANT SELECT ON ALL TABLES IN SCHEMA guidance TO guidance_reader")
 
 
 def main() -> None:

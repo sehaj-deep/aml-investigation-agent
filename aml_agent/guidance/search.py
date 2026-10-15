@@ -105,10 +105,13 @@ class GuidanceSearch:
         k = max(1, min(k, MAX_K))
         rankings = {"keyword": self.keyword(query)}
         mode = "hybrid"
-        try:
-            rankings["meaning"] = self.semantic(query)
-        except (httpx.HTTPError, KeyError, ValueError):
-            mode = "keyword"  # embedding model unreachable: keywords only
+        if os.environ.get("GUIDANCE_SEARCH") == "keyword":
+            mode = "keyword"  # no embedding model on this host
+        else:
+            try:
+                rankings["meaning"] = self.semantic(query)
+            except (httpx.HTTPError, KeyError, ValueError):
+                mode = "keyword"  # embedding model unreachable: keywords only
         scores: dict[str, float] = {}
         for ranking in rankings.values():
             for rank, pid in enumerate(ranking, start=1):

@@ -6,6 +6,8 @@ import {
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { api } from './api'
 import { useUser, type Role } from './user'
 import AlertQueue from './pages/AlertQueue'
 import CaseWorkspace from './pages/CaseWorkspace'
@@ -25,6 +27,7 @@ export default function App() {
   const location = useLocation()
   const user = useUser()
   const selected = NAV.find((n) => location.pathname.startsWith(n.key))?.key ?? '/alerts'
+  const { data: demo } = useQuery({ queryKey: ['demo'], queryFn: api.demo, staleTime: 60_000 })
 
   return (
     <Layout style={{ height: '100vh' }}>
@@ -39,6 +42,11 @@ export default function App() {
               SANDBOX
             </Tag>
           </Tooltip>
+          {demo?.demo && (
+            <Tooltip title="Public demo: the cases were reviewed in advance. Live AI (copilot, SAR drafts, re-investigation) has small daily limits.">
+              <Tag color="blue">PUBLIC DEMO</Tag>
+            </Tooltip>
+          )}
         </Space>
         <div style={{ flex: 1 }} />
         <Space size={8}>

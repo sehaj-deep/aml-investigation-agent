@@ -16,11 +16,11 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from aml_agent import store
+from aml_agent import demo, store
 from aml_agent.agent import copilot, sar
 from aml_agent.alerts.io import read_alerts, read_queue
 from aml_agent.alerts.models import Alert
@@ -76,6 +76,7 @@ def create_app(pool=None) -> FastAPI:
         app.state.pool = p
         app.state.audit = PostgresAudit(p)
         await app.state.audit.init_schema()
+        await demo.init(p)
         if await store.count_alerts(p) == 0:
             n = await store.load_alerts(p, (a.model_dump(mode="json") for a in read_queue()))
             log.info("loaded %d monitoring alerts", n)
@@ -83,6 +84,22 @@ def create_app(pool=None) -> FastAPI:
         await p.close()
 
     app = FastAPI(title="AML Investigation Agent", lifespan=lifespan)
+
+    def visitor(request: Request) -> str:
+        host = request.client.host if request.client else None
+        return demo.visitor_id(demo.client_address(request.headers, host))
+
+    async def spend(kind: str, request: Request) -> None:
+        """Count a live AI action against the demo limits (no-op outside the demo)."""
+        try:
+            await demo.use(app.state.pool, kind, visitor(request))
+        except demo.LimitReached as exc:
+            raise HTTPException(429, str(exc)) from None
+
+    @app.get("/demo")
+    async def demo_status(request: Request) -> dict:
+        """Whether this is the public demo, and the live AI actions left today."""
+        return await demo.status(app.state.pool, visitor(request))
 
     @app.get("/health")
     async def health() -> dict:
@@ -130,6 +147,10 @@ def create_app(pool=None) -> FastAPI:
     @app.post("/alerts/{alert_id}/open")
     async def open_alert(alert_id: str) -> dict:
         """The alert's case; the first open creates it and starts the AI review."""
+        if demo.enabled():
+            alert = await store.get_alert(app.state.pool, alert_id)
+            if alert is not None and alert["case_id"] is None:
+                raise HTTPException(403, "new AI reviews are not available in the demo")
         opened = await store.open_alert(app.state.pool, alert_id)
         if opened is None:
             raise HTTPException(404, "no such alert")
@@ -157,7 +178,9 @@ def create_app(pool=None) -> FastAPI:
         return case
 
     @app.post("/cases/{case_id}/decision")
-    async def decide(case_id: str, decision: Decision) -> dict:
+    async def decide(case_id: str, decision: Decision, request: Request) -> dict:
+        if decision.action == "request_more":
+            await spend("reinvestigate", request)
         try:
             await store.record_decision(app.state.pool, case_id, decision)
         except KeyError:
@@ -195,9 +218,10 @@ def create_app(pool=None) -> FastAPI:
         return {**out, "ai_limit": sar.MAX_AI_DRAFTS, "sections": list(sar.SECTIONS)}
 
     @app.post("/cases/{case_id}/sar/draft")
-    async def draft_sar(case_id: str) -> dict:
+    async def draft_sar(case_id: str, request: Request) -> dict:
         """The AI drafts the narrative from code-built facts (one model call, no tools)."""
         case = await _escalated_case(case_id)
+        await spend("sar_draft", request)
         current = await store.latest_sar(app.state.pool, case_id)
         if current["ai_drafts"] >= sar.MAX_AI_DRAFTS:
             raise HTTPException(429, f"AI draft limit reached ({sar.MAX_AI_DRAFTS} per case)")
@@ -279,7 +303,7 @@ def create_app(pool=None) -> FastAPI:
         return {"answers": answers, "used": len(answers), "limit": copilot.MAX_QUESTIONS}
 
     @app.post("/cases/{case_id}/copilot")
-    async def ask_copilot(case_id: str, body: Question) -> StreamingResponse:
+    async def ask_copilot(case_id: str, body: Question, request: Request) -> StreamingResponse:
         """Answer an analyst's question about the case, streamed as server-sent events:
         one event per data lookup, then the answer. The copilot cannot change a case."""
         case = await store.get_case(app.state.pool, case_id)
@@ -290,6 +314,7 @@ def create_app(pool=None) -> FastAPI:
         history = await store.copilot_history(app.state.pool, case_id)
         if len(history) >= copilot.MAX_QUESTIONS:
             raise HTTPException(429, f"question limit reached ({copilot.MAX_QUESTIONS} per case)")
+        await spend("copilot", request)
         if getattr(app.state, "copilot_provider", None) is None:
             app.state.copilot_provider = get_provider()
 

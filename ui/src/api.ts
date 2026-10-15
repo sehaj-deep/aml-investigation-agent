@@ -102,6 +102,12 @@ export type CopilotEvent =
   | ({ type: 'answer' } & CopilotAnswer)
   | { type: 'error'; message: string }
 
+export interface DemoStatus {
+  demo: boolean
+  left?: Record<string, number>
+  limits?: Record<string, number>
+}
+
 export interface AlertSummary {
   total: number
   by_priority: Record<string, number>
@@ -284,6 +290,7 @@ export const api = {
     return request<{ total: number; items: QueueAlert[] }>(`/alerts?${qs}`)
   },
   alertSummary: () => request<AlertSummary>('/alerts/summary'),
+  demo: () => request<DemoStatus>('/demo'),
   copilotHistory: (id: string) =>
     request<{ answers: CopilotAnswer[]; used: number; limit: number }>(`/cases/${id}/copilot`),
   // Streams the copilot's steps (server-sent events), then its answer.

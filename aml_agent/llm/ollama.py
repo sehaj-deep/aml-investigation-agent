@@ -1,11 +1,13 @@
-"""Ollama provider (cloud models through the local Ollama app, free tier).
+"""Ollama provider: cloud models through the local Ollama app, or Ollama's hosted API
+directly (OLLAMA_BASE_URL=https://ollama.com with OLLAMA_API_KEY, as on the public demo).
 
-Retries rate-limit and transient errors with exponential backoff.
+Retries rate-limit and transient server errors with exponential backoff.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from typing import Any
 
@@ -15,7 +17,17 @@ from langchain_ollama import ChatOllama
 from aml_agent.llm.base import ChatResponse, ToolCall
 
 MAX_RETRIES = 5
-RETRYABLE = ("429", "rate limit", "too many requests", "503", "502", "timeout", "temporarily")
+RETRYABLE = (
+    "429",
+    "rate limit",
+    "too many requests",
+    "500",
+    "internal server error",
+    "503",
+    "502",
+    "timeout",
+    "temporarily",
+)
 
 
 def _to_langchain(messages: list[dict[str, Any]]) -> list:
@@ -42,7 +54,16 @@ class OllamaProvider:
 
     def __init__(self, model: str, base_url: str, temperature: float = 0.0, seed: int = 7):
         self.model = model
-        self._llm = ChatOllama(model=model, base_url=base_url, temperature=temperature, seed=seed)
+        # The hosted API takes the key as a bearer token; the local app needs none.
+        key = os.environ.get("OLLAMA_API_KEY")
+        client = {"headers": {"Authorization": f"Bearer {key}"}} if key else {}
+        self._llm = ChatOllama(
+            model=model,
+            base_url=base_url,
+            temperature=temperature,
+            seed=seed,
+            client_kwargs=client,
+        )
 
     async def chat(
         self, messages: list[dict[str, Any]], tools: list[dict] | None = None
