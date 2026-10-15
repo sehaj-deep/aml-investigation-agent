@@ -229,3 +229,56 @@ def test_failed_review_can_be_retried(stack):
     case = httpx.get(f"{api}/cases/{case_id}").json()
     assert case["status"] == "queued" and case["error"] is None
     assert httpx.post(f"{api}/cases/nope/retry").status_code == 404
+
+
+def test_sar_draft_review_and_four_eyes_approval(stack):
+    api = stack["api"]
+    case_id = httpx.post(f"{api}/cases", json={"alert_id": "dev-0006"}).json()["case_id"]
+    base = f"{api}/cases/{case_id}"
+    assert httpx.post(f"{base}/sar/draft").status_code == 409  # not escalated yet
+    worker = start_worker(stack["worker_env"])
+    try:
+        wait_status(api, case_id, "pending_review")
+        escalate = {"action": "escalate", "reason": "Rapid dispersion.", "reviewer": "ana"}
+        assert httpx.post(f"{base}/decision", json=escalate).status_code == 200
+        wait_status(api, case_id, "pending_approval")
+        confirm = {
+            "action": "confirm_escalation",
+            "reason": "Agreed.",
+            "reviewer": "sam",
+            "role": "supervisor",
+        }
+        assert httpx.post(f"{base}/decision", json=confirm).status_code == 200
+        wait_status(api, case_id, "escalated")
+    finally:
+        worker.terminate()
+        worker.wait(timeout=30)
+
+    drafted = httpx.post(f"{base}/sar/draft", timeout=60)
+    assert drafted.status_code == 200
+    v1 = drafted.json()
+    assert v1["version_no"] == 1 and v1["source"] == "ai" and v1["warnings"] == []
+    assert v1["facts"]["transactions"] and v1["facts"]["filing_due"]
+    supervisor = {"reviewer": "sam", "role": "supervisor"}
+    # An unedited AI draft cannot be approved: an analyst reviews and saves it first.
+    assert httpx.post(f"{base}/sar/approve", json=supervisor).status_code == 409
+    edit = {"sections": v1["sections"], "author": "ana", "role": "analyst"}
+    edit["sections"]["conclusion"] = "Reviewed by the analyst; the account is referred for filing."
+    v2 = httpx.put(f"{base}/sar", json=edit).json()
+    assert v2["version_no"] == 2 and v2["source"] == "analyst"
+    assert (
+        httpx.post(f"{base}/sar/approve", json={**supervisor, "reviewer": "ana"}).status_code == 409
+    )
+    assert (
+        httpx.post(f"{base}/sar/approve", json={**supervisor, "role": "analyst"}).status_code == 409
+    )
+    approved = httpx.post(f"{base}/sar/approve", json=supervisor)
+    assert approved.status_code == 200 and approved.json()["status"] == "approved"
+    assert httpx.put(f"{base}/sar", json=edit).status_code == 409  # approved is final
+    doc = httpx.get(f"{base}/sar/export")
+    assert doc.headers["content-type"].startswith("text/markdown")
+    assert "Reviewed by the analyst" in doc.text and "approved by sam" in doc.text
+    state = httpx.get(f"{base}/sar").json()
+    assert state["versions"] == 2 and state["ai_drafts"] == 1
+    audit = [e["event_type"] for e in httpx.get(f"{base}/audit").json()["events"]]
+    assert {"sar_drafted", "sar_edited", "sar_approved"} <= set(audit)

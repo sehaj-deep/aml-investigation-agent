@@ -42,8 +42,9 @@ export default function AlertQueue() {
   const [page, setPage] = useState(1)
   const { data, isLoading, isFetching, error } = useQuery({
     queryKey: ['alerts', status, priority, search, page],
+    // A search looks across every status, closed and escalated alerts included.
     queryFn: () =>
-      api.alerts({ status, priority, q: search, limit: PAGE, offset: (page - 1) * PAGE }),
+      api.alerts({ status: search ? '' : status, priority, q: search, limit: PAGE, offset: (page - 1) * PAGE }),
     placeholderData: keepPreviousData,
     refetchInterval: 5000,
   })
@@ -72,7 +73,13 @@ export default function AlertQueue() {
         {error && <Alert type="error" showIcon message={`Could not load alerts: ${String(error)}`} />}
         <Card size="small">
           <Space wrap>
-            <Select value={status} onChange={reset(setStatus)} options={STATUS_FILTERS} style={{ width: 200 }} />
+            <Select
+              value={search ? '' : status}
+              onChange={reset(setStatus)}
+              options={STATUS_FILTERS}
+              disabled={!!search}
+              style={{ width: 200 }}
+            />
             <Select
               value={priority}
               onChange={reset(setPriority)}
@@ -86,7 +93,9 @@ export default function AlertQueue() {
               style={{ width: 260 }}
             />
             <Typography.Text type="secondary">
-              {data ? `${data.total.toLocaleString()} alerts` : ''}
+              {data
+                ? `${data.total.toLocaleString()} alert${data.total === 1 ? '' : 's'}${search ? ', all statuses' : ''}`
+                : ''}
             </Typography.Text>
           </Space>
         </Card>

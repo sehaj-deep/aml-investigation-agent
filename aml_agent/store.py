@@ -85,6 +85,25 @@ CREATE TABLE IF NOT EXISTS copilot_messages (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS copilot_case_idx ON copilot_messages (case_id, id);
+CREATE TABLE IF NOT EXISTS sar_drafts (
+    id          BIGSERIAL PRIMARY KEY,
+    case_id     TEXT NOT NULL REFERENCES cases (case_id),
+    version_no  INTEGER NOT NULL,
+    sections    JSONB NOT NULL,
+    facts       JSONB NOT NULL,
+    warnings    JSONB NOT NULL DEFAULT '[]',
+    source      TEXT NOT NULL CHECK (source IN ('ai', 'analyst')),
+    author      TEXT NOT NULL,
+    role        TEXT,
+    model       TEXT,
+    version     TEXT,
+    tokens      INTEGER,
+    status      TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'approved')),
+    approved_by TEXT,
+    approved_at TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (case_id, version_no)
+);
 CREATE TABLE IF NOT EXISTS decisions (
     decision_id BIGSERIAL PRIMARY KEY,
     case_id     TEXT NOT NULL REFERENCES cases (case_id),
@@ -367,6 +386,92 @@ async def copilot_history(pool: AsyncConnectionPool, case_id: str) -> list[dict]
                 [case_id],
             )
         ).fetchall()
+
+
+async def latest_sar(pool: AsyncConnectionPool, case_id: str) -> dict:
+    """The latest SAR draft version of a case, with version counts."""
+    async with pool.connection() as conn:
+        latest = await (
+            await conn.execute(
+                "SELECT * FROM sar_drafts WHERE case_id = %s ORDER BY version_no DESC LIMIT 1",
+                [case_id],
+            )
+        ).fetchone()
+        counts = await (
+            await conn.execute(
+                "SELECT count(*) AS versions, count(*) FILTER (WHERE source = 'ai') AS ai_drafts "
+                "FROM sar_drafts WHERE case_id = %s",
+                [case_id],
+            )
+        ).fetchone()
+    return {"sar": latest, **counts}
+
+
+async def add_sar_version(pool: AsyncConnectionPool, case_id: str, v: dict) -> dict:
+    """Save a new SAR draft version. An approved report is final."""
+    async with pool.connection() as conn, conn.transaction():
+        await conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ["sar:" + case_id])
+        last = await (
+            await conn.execute(
+                "SELECT version_no, status FROM sar_drafts WHERE case_id = %s "
+                "ORDER BY version_no DESC LIMIT 1",
+                [case_id],
+            )
+        ).fetchone()
+        if last and last["status"] == "approved":
+            raise CaseStateError("the report is approved and can no longer be edited")
+        return await (
+            await conn.execute(
+                """
+                INSERT INTO sar_drafts (case_id, version_no, sections, facts, warnings, source,
+                    author, role, model, version, tokens)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+                """,
+                [
+                    case_id,
+                    (last["version_no"] if last else 0) + 1,
+                    Jsonb(v["sections"]),
+                    Jsonb(v["facts"]),
+                    Jsonb(v["warnings"]),
+                    v["source"],
+                    v["author"],
+                    v.get("role"),
+                    v.get("model"),
+                    v.get("version"),
+                    v.get("tokens"),
+                ],
+            )
+        ).fetchone()
+
+
+async def approve_sar(pool: AsyncConnectionPool, case_id: str, reviewer: str, role: str) -> dict:
+    """Four-eyes approval of the latest version: a supervisor who did not write it, and
+    only after an analyst has reviewed and saved the narrative."""
+    async with pool.connection() as conn, conn.transaction():
+        last = await (
+            await conn.execute(
+                "SELECT * FROM sar_drafts WHERE case_id = %s ORDER BY version_no DESC LIMIT 1 "
+                "FOR UPDATE",
+                [case_id],
+            )
+        ).fetchone()
+        if last is None:
+            raise KeyError(case_id)
+        if last["status"] == "approved":
+            raise CaseStateError("the report is already approved")
+        if last["source"] != "analyst":
+            raise CaseStateError("an analyst must review and save the AI draft before approval")
+        if role != "supervisor":
+            raise CaseStateError("four-eyes rule: only a supervisor can approve the report")
+        if reviewer == last["author"]:
+            raise CaseStateError("four-eyes rule: the report must be approved by someone else")
+        return await (
+            await conn.execute(
+                "UPDATE sar_drafts SET status = 'approved', approved_by = %s, approved_at = now() "
+                "WHERE id = %s RETURNING *",
+                [reviewer, last["id"]],
+            )
+        ).fetchone()
 
 
 async def get_case(pool: AsyncConnectionPool, case_id: str) -> dict | None:

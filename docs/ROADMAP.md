@@ -37,7 +37,7 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 - Compared against the LLM's pattern call on dev alerts; the better source feeds the case file.
 
 **D. LLM analyst**
-- Reads the case file and detection reasons; recommends escalate, close or more information, with reasons; drafts a suspicious-activity-style narrative.
+- Reads the case file and detection reasons; recommends escalate, close or more information, with reasons; drafts a suspicious-activity-style narrative (built: SAR draft with checks and four-eyes approval, decision 0017).
 - Measured on clearing false alarms safely (benign alerts closed without missing real ones), narrative quality, and cost.
 - Ablations: no LLM, no case file.
 - **Investigator copilot** (built, decision 0016; its measured question set comes with the final evaluation). A chat agent attached to each case: the investigator asks questions ("who else did A4 pay?", "is this amount unusual for this account?", "show the money trail from A7") and the agent answers by calling the read-only MCP tools live, citing the transactions it used. Same controls as the case agent: bounded tools, step and token budgets, every call in the audit log, answers checked by the verifier, no write actions. Measured on a small set of scripted investigator questions with known answers (correct answer, tool calls, latency, cost).

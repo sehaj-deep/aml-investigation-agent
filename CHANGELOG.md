@@ -8,6 +8,7 @@
 - One alert queue (Postgres, paged): every alert shows its priority, reasons and flagged payments before it is opened; opening it starts the AI review, and the code-built evidence appears within seconds.
 - Analyst outcomes (close as false alarm, escalate for SAR review, needs more information) and a supervisor step for escalations; the four-eyes rule is enforced by the API and the workflow (decision 0015).
 - Investigator copilot: a chat panel on the case screen that answers questions with the same read-only tools, streams its lookups, checks every cited transaction and records everything in the audit log (decision 0016).
+- Suspicious activity report draft after a confirmed escalation: code builds the facts, the AI writes the narrative, every cited transaction and amount is checked, an analyst reviews and saves it, and a different supervisor approves it (decision 0017).
 - Reliability: if the tool server connection drops, the worker requeues the case, reconnects and resumes from the last checkpoint instead of failing it; a failed review can be retried from the case screen.
 - Plain-language case screen and history; model and instruction versions only on the Governance page. Prompt p8 reads why the alert was raised.
 - Decision records 0012 (first, account-level version), 0013 and 0014; scorecard part A updated.

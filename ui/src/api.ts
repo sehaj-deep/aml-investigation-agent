@@ -52,6 +52,31 @@ export interface QueueAlert {
   pattern: string | null
 }
 
+export interface SarFacts {
+  subject: { bank_id: string; account: string; jurisdiction: string | null }
+  review_period: { start: string; end: string }
+  transactions: { tx_id: number; timestamp: string; from: string; to: string; amount: string; currency: string }[]
+  totals: { sent_by_subject: Record<string, string>; received_by_subject: Record<string, string> }
+  red_flags: { who: string; rule: string; description: string }[]
+  filing_due: string | null
+}
+
+export interface SarVersion {
+  id: number
+  case_id: string
+  version_no: number
+  sections: Record<string, string>
+  facts: SarFacts
+  warnings: string[]
+  source: 'ai' | 'analyst'
+  author: string
+  role: string | null
+  status: 'draft' | 'approved'
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+}
+
 export interface CopilotAnswer {
   id: number
   question: string
@@ -288,6 +313,21 @@ export const api = {
       events: { seq: number; event_type: string; actor: string; created_at: string; payload: Record<string, unknown> }[]
     }>(`/cases/${id}/audit`),
   stats: () => request<Stats>('/stats'),
+  sar: (id: string) =>
+    request<{ sar: SarVersion | null; versions: number; ai_drafts: number; ai_limit: number; sections: string[] }>(
+      `/cases/${id}/sar`,
+    ),
+  draftSar: (id: string) => request<SarVersion>(`/cases/${id}/sar/draft`, { method: 'POST' }),
+  saveSar: (id: string, sections: Record<string, string>, author: string, role: string) =>
+    request<SarVersion>(`/cases/${id}/sar`, {
+      method: 'PUT',
+      body: JSON.stringify({ sections, author, role }),
+    }),
+  approveSar: (id: string, reviewer: string, role: string) =>
+    request<SarVersion>(`/cases/${id}/sar/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ reviewer, role }),
+    }),
   retry: (id: string) => request<{ status: string }>(`/cases/${id}/retry`, { method: 'POST' }),
   decide: (id: string, action: Decision['action'], reason: string, reviewer: string, role: Decision['role']) =>
     request<{ status: string }>(`/cases/${id}/decision`, {

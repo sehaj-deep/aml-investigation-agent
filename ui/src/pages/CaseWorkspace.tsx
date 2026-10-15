@@ -29,6 +29,7 @@ import { api, type CaseDetail, type Decision, type Evidence, type Trigger } from
 import { ActionTag, PatternTag, PriorityTag, StatusTag, VerifiedBadge, statusText } from '../components/badges'
 import NetworkGraph from '../components/NetworkGraph'
 import CopilotPanel from '../components/CopilotPanel'
+import SarPanel from '../components/SarPanel'
 import { useUser } from '../user'
 import { DECISION_LABEL, DECISION_PAST, RISK_RULES, factorText, typologyName } from '../terms'
 
@@ -278,6 +279,11 @@ export default function CaseWorkspace() {
                         ]}
                       />
                     ),
+                  },
+                  {
+                    key: 'sar',
+                    label: c.status === 'escalated' ? 'SAR draft' : 'SAR draft (after escalation)',
+                    children: <SarPanel c={c} />,
                   },
                   { key: 'history', label: 'History', children: <HistoryTab caseId={c.case_id} /> },
                 ]}
@@ -650,6 +656,16 @@ function plain(e: AuditEvent): string | null {
   switch (e.event_type) {
     case 'case_created':
       return 'Alert opened; AI review requested'
+    case 'sar_drafted':
+      return `AI drafted the SAR narrative (version ${p.version_no})`
+    case 'sar_edited':
+      return `SAR narrative reviewed and saved (version ${p.version_no})`
+    case 'sar_approved':
+      return `SAR approved for filing (version ${p.version_no})`
+    case 'copilot_question':
+      return `Asked the copilot: ${p.question}`
+    case 'retry_requested':
+      return 'AI review retried'
     case 'node_started':
       return STEP_TEXT[String(p.node)] ?? null
     case 'decision_recorded':
@@ -680,6 +696,7 @@ function who(e: AuditEvent): string {
   if (e.event_type === 'model_call') return 'AI'
   if (e.event_type.startsWith('node_')) return AI_STEPS.has(String(e.payload.node)) ? 'AI' : 'system'
   if (e.actor === 'api' || e.actor === 'worker' || e.actor === 'agent') return 'system'
+  if (e.actor === 'ai' || e.actor === 'copilot') return 'AI'
   return e.actor
 }
 

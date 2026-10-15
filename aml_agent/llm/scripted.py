@@ -26,6 +26,7 @@ from aml_agent.llm.base import ChatResponse, ToolCall
 
 ALERT_RE = re.compile(r"<alert>\s*(\{.*?\})\s*</alert>", re.S)
 EM_DASH = chr(0x2014)
+SAR_KEYS = ("introduction", "subjects", "activity", "why_suspicious", "conclusion")
 
 
 def _alert(messages: list[dict]) -> dict:
@@ -83,7 +84,9 @@ class ScriptedProvider:
     ) -> ChatResponse:
         self.calls += 1
         phase = "copilot" if "investigation copilot" in messages[0]["content"] else _phase(messages)
-        if phase == "copilot":
+        if "TASK: SAR DRAFT" in messages[-1]["content"]:
+            resp = self._sar(messages)
+        elif phase == "copilot":
             resp = self._copilot(messages, tools)
         elif phase == "investigate":
             resp = self._investigate(messages)
@@ -134,6 +137,12 @@ class ScriptedProvider:
         cite = re.search(r"\btx (\d+)", messages[1]["content"])
         ref = f" (tx {cite.group(1)})" if cite else ""
         return ChatResponse(content=f"Scripted copilot answer: the subject was looked up{ref}.")
+
+    def _sar(self, messages: list[dict]) -> ChatResponse:
+        row = re.search(r"^tx (\d+) \S+ \S+ -> \S+: (\S+) (.+)$", messages[-1]["content"], re.M)
+        cite = f"tx {row.group(1)} ({row.group(2)} {row.group(3)})" if row else "the evidence"
+        text = f"Scripted SAR text for harness testing; it cites {cite}."
+        return ChatResponse(content=json.dumps({k: text for k in SAR_KEYS}))
 
     def _hypothesize(self, messages: list[dict]) -> ChatResponse:
         if self.policy == "bad_json" and not self._bad_json_sent:
