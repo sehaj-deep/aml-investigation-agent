@@ -14,6 +14,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from aml_agent.guidance.search import MAX_K, GuidanceSearch
 from aml_agent.tools.graph import GraphTools
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
@@ -28,6 +29,16 @@ def tools() -> GraphTools:
     return _tools
 
 
+_guidance: GuidanceSearch | None = None
+
+
+def guidance() -> GuidanceSearch:
+    global _guidance
+    if _guidance is None:
+        _guidance = GuidanceSearch()
+    return _guidance
+
+
 def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
     mcp = FastMCP(
         "aml-graph",
@@ -35,11 +46,28 @@ def build_server(host: str = "127.0.0.1", port: int = 8001) -> FastMCP:
             "Read-only tools over a synthetic transaction graph. Accounts are identified by "
             "(bank_id, account). Amounts are per currency; never add amounts in different "
             "currencies. Times are ISO 8601 without time zone. Data runs from 2022-09-01 to "
-            "2022-09-10."
+            "2022-09-18. search_guidance searches public AML guidance (FinCEN, FFIEC)."
         ),
         host=host,
         port=port,
     )
+
+    @mcp.tool(annotations=READ_ONLY)
+    def search_guidance(query: str, k: int = 5) -> dict:
+        """Search public AML guidance (FFIEC red flags, FinCEN advisories on funnel accounts
+        and shell companies, FinCEN SAR narrative guidance) for passages about a typology,
+        red flag or reporting question. Returns up to k passages (1 to 8) with passage_id,
+        source, where (page or section), url and text. Cite a passage by its passage_id and
+        quote its exact words."""
+        query = " ".join(query.split())
+        if not 3 <= len(query) <= 300:
+            raise ValueError("query must be 3 to 300 characters")
+        if not 1 <= k <= MAX_K:
+            raise ValueError(f"k must be 1 to {MAX_K}")
+        try:
+            return guidance().search(query, k)
+        except Exception as exc:  # store not set up or not reachable: say so, do not crash
+            return {"mode": "unavailable", "passages": [], "error": type(exc).__name__}
 
     @mcp.tool(annotations=READ_ONLY)
     def get_account_summary(

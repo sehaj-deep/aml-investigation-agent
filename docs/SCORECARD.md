@@ -72,6 +72,14 @@ By alert volume, the model's top 1,000 accounts are 96% laundering against 28% f
 
 **Results so far** (`docs/findings/2026-10-14-evidence-coverage.md`): small model, prompt p5, one run over 48 alerts: typology 50% (code's top candidate 54%; code 13 of 15, 87%, on the five typologies it targets); evidence coverage 63%, precision 53%; real alerts escalated 63%, closed 21%; benign alerts escalated 29%. Not yet measured with the risk indicators (prompt p7).
 
+## E. Guidance retrieval
+
+**Test set.** 18 investigator questions, each with the public guidance document that answers it (`evals/guidance_eval.py`).
+
+**Metrics.** Hit rate at 1 and 3 (the right document among the top results) and mean reciprocal rank, for keyword, meaning (embeddings) and hybrid search.
+
+**Results (2026-10-14, 159 passages from 5 documents).** Hybrid: right document first 88.9%, in the top 3 100%, MRR 0.935. Keyword alone: 77.8%, 88.9%, 0.856. Meaning alone: 83.3%, 100%, 0.907. With five documents this is an easy retrieval task; quote faithfulness (every cited quote checked word for word) matters more for the product.
+
 ## C. Cost
 
 **Metrics.** Tokens, quota share and wall time per case; tool-query latency.

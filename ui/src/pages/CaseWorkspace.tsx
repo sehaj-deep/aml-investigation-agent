@@ -23,9 +23,9 @@ import {
   Timeline,
   Typography,
 } from 'antd'
-import { ArrowLeftOutlined, LockOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CheckCircleFilled, LockOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { api, type CaseDetail, type Decision, type Evidence, type Trigger } from '../api'
+import { api, type CaseDetail, type Decision, type Evidence, type GuidancePassage, type Trigger } from '../api'
 import { ActionTag, PatternTag, PriorityTag, StatusTag, VerifiedBadge, statusText } from '../components/badges'
 import NetworkGraph from '../components/NetworkGraph'
 import CopilotPanel from '../components/CopilotPanel'
@@ -482,6 +482,7 @@ function AssessmentCard({ c }: { c: CaseDetail }) {
           <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
             <b>Not checked:</b> {d.limitations}
           </Typography.Paragraph>
+          <GuidanceList passages={c.analysis?.guidance ?? []} />
           <Space>
             <VerifiedBadge faithful={c.verification?.faithful} />
             <span>
@@ -514,6 +515,45 @@ function AssessmentCard({ c }: { c: CaseDetail }) {
 
 const ANALYST_OPTIONS = ['close', 'escalate', 'request_more'] as const
 const SUPERVISOR_OPTIONS = ['confirm_escalation', 'return_to_analyst'] as const
+
+function GuidanceList({ passages }: { passages: GuidancePassage[] }) {
+  const cited = passages.filter((p) => p.quotes.length > 0)
+  const other = passages.filter((p) => p.quotes.length === 0)
+  if (passages.length === 0) return null
+  return (
+    <div>
+      <div className="panel-title" style={{ marginBottom: 4 }}>
+        Guidance cited
+      </div>
+      {cited.length === 0 && (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          The AI cited no guidance for this case.
+        </Typography.Text>
+      )}
+      {cited.map((p) => (
+        <div key={p.passage_id} style={{ fontSize: 12, marginBottom: 6 }}>
+          {p.quotes.map((q, i) => (
+            <div key={i}>
+              <CheckCircleFilled style={{ color: '#2f855a', marginInlineEnd: 4 }} />
+              <i>&ldquo;{q}&rdquo;</i>
+            </div>
+          ))}
+          <Typography.Text type="secondary">
+            {p.source}, {p.where}.{' '}
+            <a href={p.url} target="_blank" rel="noreferrer">
+              Open source
+            </a>
+          </Typography.Text>
+        </div>
+      ))}
+      {other.length > 0 && (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Also found: {other.map((p) => `${p.source} (${p.where})`).join('; ')}
+        </Typography.Text>
+      )}
+    </div>
+  )
+}
 
 function DecisionCard({ c }: { c: CaseDetail }) {
   const user = useUser()

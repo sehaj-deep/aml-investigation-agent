@@ -1,0 +1,149 @@
+{
+ "created_utc": "20261015T030010Z",
+ "questions": 18,
+ "summary": {
+  "keyword": {
+   "hit_at_1": 0.778,
+   "hit_at_3": 0.889,
+   "mrr": 0.856
+  },
+  "meaning": {
+   "hit_at_1": 0.833,
+   "hit_at_3": 1.0,
+   "mrr": 0.907
+  },
+  "hybrid": {
+   "hit_at_1": 0.889,
+   "hit_at_3": 1.0,
+   "mrr": 0.935
+  }
+ },
+ "rows": [
+  {
+   "question": "What is a funnel account?",
+   "expected": "fincen-fin-2014-a005",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "cash deposits in one state withdrawn quickly in another state",
+   "expected": "fincen-fin-2014-a005",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "red flags for funnel account activity",
+   "expected": "fincen-fin-2014-a005",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "trade-based money laundering with narcotics proceeds",
+   "expected": "fincen-fin-2014-a005",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "shell companies with little physical presence used for money laundering",
+   "expected": "fincen-fin-2006-g014",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "wire transfers through shell companies with no business purpose",
+   "expected": "fincen-fin-2006-g014",
+   "keyword": 2,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "foreign correspondent bank wire transfer volume above the expected profile",
+   "expected": "fincen-fin-2006-g014",
+   "keyword": 5,
+   "meaning": 1,
+   "hybrid": 2
+  },
+  {
+   "question": "what should a SAR narrative contain: who, what, when, where and why",
+   "expected": "fincen-sar",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "how to describe why the activity is unusual for the customer",
+   "expected": "fincen-sar",
+   "keyword": 1,
+   "meaning": 2,
+   "hybrid": 1
+  },
+  {
+   "question": "common errors in suspicious activity report narratives",
+   "expected": "fincen-sar-common-errors",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "do not write see attached in the narrative",
+   "expected": "fincen-sar",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "funds transfers with no logical business or economic purpose",
+   "expected": "ffiec-appendix-f",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "customer provides insufficient or suspicious identification",
+   "expected": "ffiec-appendix-f",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "structuring cash deposits to avoid reporting requirements",
+   "expected": "ffiec-appendix-f",
+   "keyword": 5,
+   "meaning": 3,
+   "hybrid": 3
+  },
+  {
+   "question": "transactions with higher-risk jurisdictions or secrecy havens",
+   "expected": "ffiec-appendix-f",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "many funds transfers sent in large round dollar amounts",
+   "expected": "ffiec-appendix-f",
+   "keyword": 1,
+   "meaning": 1,
+   "hybrid": 1
+  },
+  {
+   "question": "rapid movement of funds in and out of an account",
+   "expected": "ffiec-appendix-f",
+   "keyword": 1,
+   "meaning": 2,
+   "hybrid": 1
+  },
+  {
+   "question": "activity inconsistent with the customer's business",
+   "expected": "ffiec-appendix-f",
+   "keyword": 2,
+   "meaning": 1,
+   "hybrid": 1
+  }
+ ]
+}

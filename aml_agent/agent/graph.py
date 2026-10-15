@@ -43,6 +43,7 @@ from pydantic import BaseModel, ValidationError
 
 from aml_agent.agent import prompts
 from aml_agent.agent.casefile import build_case_file, resolve_accounts
+from aml_agent.analysis.risk import RULE_BY_CODE
 from aml_agent.instrument import (
     InstrumentedClient,
     InstrumentedProvider,
@@ -57,6 +58,7 @@ from aml_agent.schemas.case import (
     Decision,
     DraftReply,
     Evidence,
+    GuidanceCitation,
     HypothesisReply,
 )
 from aml_agent.tools.client import GraphClient
@@ -99,6 +101,7 @@ class CaseState(TypedDict, total=False):
     risk: dict
     triggers: list[dict]
     case_file: str
+    guidance: list[dict]
     steps: int
     tool_calls: int
     round_steps: int
@@ -120,6 +123,43 @@ class CaseState(TypedDict, total=False):
     next_after_review: str
     next_after_supervisor: str
     status: str
+
+
+GUIDANCE_PASSAGES = 4
+
+
+def _normalize(text: str) -> str:
+    """Compare quotes ignoring case, spacing, quote marks and dash styles."""
+    for a, b in (("\u2019", "'"), ("\u2018", "'"), ("\u201c", '"'), ("\u201d", '"')):
+        text = text.replace(a, b)
+    text = re.sub(r"[\u2010-\u2015-]", "-", text)
+    return " ".join(text.lower().split())
+
+
+def _check_guidance(
+    passages: list[dict], quotes: list, warnings: list[str]
+) -> tuple[list[dict], list[GuidanceCitation]]:
+    """Keep the citations whose quote appears word for word in a passage found for this
+    case; report the others. Returns the passages (with what was cited) and the citations."""
+    by_id = {p["passage_id"]: {**p, "quotes": []} for p in passages}
+    citations: list[GuidanceCitation] = []
+    for q in quotes:
+        passage = by_id.get(q.passage_id)
+        if passage is None:
+            warnings.append(f"GUIDANCE_NOT_FOUND: {q.passage_id} was not among the passages found")
+        elif _normalize(q.quote) not in _normalize(passage["text"]):
+            warnings.append(f"GUIDANCE_QUOTE_NOT_FOUND: the quote from {q.passage_id} is not in it")
+        else:
+            passage["quotes"].append(q.quote)
+            citations.append(
+                GuidanceCitation(
+                    chunk_id=q.passage_id,
+                    source=passage["source"],
+                    jurisdiction=passage["jurisdiction"],
+                    quote_span=q.quote,
+                )
+            )
+    return list(by_id.values()), citations
 
 
 def _collect_tx_ids(obj: Any, out: list[int]) -> None:
@@ -462,9 +502,14 @@ def build_graph(
         }
 
     async def draft(state: CaseState) -> CaseState:
-        parsed, update = await _structured(state, prompts.DRAFT, DraftReply)
-        warnings = list(state["warnings"])
         hypothesis = state.get("hypothesis")
+        passages, log = await _find_guidance(state, hypothesis)
+        parsed, update = await _structured(
+            {**state, "tool_log": log},
+            prompts.DRAFT + "\n" + prompts.guidance_block(passages),
+            DraftReply,
+        )
+        warnings = list(state["warnings"])
         if parsed is None:
             warnings.append("MODEL_OUTPUT_INVALID: draft reply failed validation twice")
             reply = DraftReply(
@@ -489,7 +534,7 @@ def build_graph(
             for r in state.get("evidence_rows", [])
         ]
         cited = [e.tx_id for e in evidence]
-        log = list(state["tool_log"])
+        guidance, citations = _check_guidance(passages, reply.guidance_citations, warnings)
         case = Case(
             case_id=state["case_id"],
             pattern_hypothesis=hypothesis["pattern_hypothesis"] if hypothesis else "none",
@@ -498,6 +543,7 @@ def build_graph(
             recommended_action=reply.recommended_action,
             confidence=reply.confidence,
             limitations=_strip_em_dash(reply.limitations, warnings, "limitations"),
+            guidance_citations=citations,
         )
         if hypothesis is None:
             warnings.append("pattern_hypothesis defaulted to none because the hypothesis failed")
@@ -505,10 +551,38 @@ def build_graph(
             **update,
             "tool_log": log,
             "cited_tx_ids": cited,
+            "guidance": guidance,
             "case": case.model_dump(),
             "warnings": warnings,
             "status": "pending_review",
         }
+
+    async def _find_guidance(state: CaseState, hypothesis: dict | None) -> tuple[list, list]:
+        """Guidance passages for the typology and red flags, found by code through MCP."""
+        risk = state.get("risk") or {}
+        codes = [
+            *((risk.get("subject") or {}).get("rules") or []),
+            *((risk.get("top_counterparty") or {}).get("rules") or []),
+        ]
+        flags = [RULE_BY_CODE[c].title for c in dict.fromkeys(codes) if c in RULE_BY_CODE]
+        pattern = hypothesis["pattern_hypothesis"] if hypothesis else None
+        args = {"query": prompts.guidance_query(pattern, flags), "k": GUIDANCE_PASSAGES}
+        result = await client.call("search_guidance", args)
+        log = [
+            *state["tool_log"],
+            {
+                "by": "system",
+                "step": state["steps"],
+                "name": "search_guidance",
+                "arguments": args,
+                "ok": result.ok,
+                "error": result.error,
+                "duration_ms": round(result.duration_ms, 1),
+                "executed": True,
+            },
+        ]
+        passages = (result.content or {}).get("passages", []) if result.ok else []
+        return passages, log
 
     async def verify(state: CaseState) -> CaseState:
         warnings = list(state["warnings"])

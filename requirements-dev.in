@@ -3,3 +3,4 @@ pytest
 ruff
 pre-commit
 pip-tools
+pypdf  # guidance ingestion (scripts/build_guidance.py)

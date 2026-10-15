@@ -164,6 +164,13 @@ class ScriptedProvider:
         )
 
     def _draft(self, messages: list[dict]) -> ChatResponse:
+        # Cite the first guidance passage offered, quoting its first five words.
+        found = re.search(r"^passage_id=(\S+) .*\n(.+)$", messages[-1]["content"], re.M)
+        cite = (
+            [{"passage_id": found.group(1), "quote": " ".join(found.group(2).split()[:5])}]
+            if found
+            else []
+        )
         dash = f" {EM_DASH} " if self.policy == "emdash" else ", "
         none = self.policy == "none"
         return ChatResponse(
@@ -173,6 +180,7 @@ class ScriptedProvider:
                     "recommended_action": "close" if none else "escalate",
                     "confidence": "low",
                     "limitations": "Scripted output for harness testing; not a model result.",
+                    "guidance_citations": cite,
                 }
             )
         )

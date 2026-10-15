@@ -33,7 +33,9 @@ import json
 #     whole data), and the investigation makes required checks with the tools before
 #     concluding: the subject's history, the key counterparty, and the onward money.
 #     "needs_more_info" is kept for questions the tools cannot answer.
-PROMPT_VERSION = "p9"
+# p10: the draft receives public AML guidance passages found by code for the typology
+#      and red flags, and may cite one to three with short exact quotes (checked by code).
+PROMPT_VERSION = "p10"
 
 SYSTEM = """You are an anti-money-laundering (AML) investigator working on SYNTHETIC data.
 You receive an alert raised by transaction monitoring: one seed account (the subject), a
@@ -154,7 +156,11 @@ above. Reply with one JSON object and nothing else:
 {"summary": "<what you found, in plain sentences, naming accounts by label>",
  "recommended_action": "<escalate|close|needs_more_info>",
  "confidence": "<low|medium|high>",
- "limitations": "<what you could not check>"}
+ "limitations": "<what you could not check>",
+ "guidance_citations": [{"passage_id": "<id of a guidance passage below>",
+                         "quote": "<exact words copied from that passage, at most 25 words>"}]}
+Cite one to three guidance passages that support your reasoning, or none if none fits.
+Copy each quote exactly; code checks it against the passage.
 In the summary, say what the checks with the tools showed (the subject's history, the key
 counterparty, the onward money). Use "needs_more_info" only for a question the tools cannot
 answer, such as the customer's background or the purpose of the payments, and name that
@@ -166,6 +172,36 @@ account, layering via intermediaries, round-tripping or a layering chain, and do
 internal pattern names (fan-in, fan-out, gather-scatter, scatter-gather, cycle, random,
 bipartite, stack) in the summary or limitations.
 Do not restate amounts you are unsure of; the evidence rows carry the exact figures."""
+
+
+# Search terms per pattern, in the language of AML guidance.
+TYPOLOGY_TERMS = {
+    "fan-out": "rapid dispersion of funds to many recipients, structuring of outgoing transfers",
+    "fan-in": "funnel account, funds from many sources concentrated in one account",
+    "gather-scatter": "pass-through account, funds received and quickly paid out",
+    "scatter-gather": "layering through intermediary accounts, split and recombined funds",
+    "cycle": "round-tripping, funds returned to the originator through intermediaries",
+    "random": "layering chain, rapid movement of funds through several accounts",
+    "bipartite": "coordinated transfers between groups of accounts, no business purpose",
+    "stack": "multiple layers of transfers between groups of accounts, layering",
+    "none": "unusual transfers with no apparent business purpose",
+}
+
+
+def guidance_query(pattern: str | None, red_flags: list[str]) -> str:
+    terms = TYPOLOGY_TERMS.get(pattern or "none", TYPOLOGY_TERMS["none"])
+    flags = "; ".join(red_flags[:6])
+    return f"{terms}. Red flags: {flags}" if flags else terms
+
+
+def guidance_block(passages: list[dict]) -> str:
+    if not passages:
+        return "\nGUIDANCE PASSAGES: none were found; leave guidance_citations empty."
+    lines = ["", "GUIDANCE PASSAGES (public AML guidance found by code for this case):"]
+    for p in passages:
+        lines.append(f"passage_id={p['passage_id']} | {p['source']} | {p['where']}")
+        lines.append(p["text"])
+    return "\n".join(lines)
 
 
 def schema_retry(error: str) -> str:

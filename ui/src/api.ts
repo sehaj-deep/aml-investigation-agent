@@ -52,6 +52,16 @@ export interface QueueAlert {
   pattern: string | null
 }
 
+export interface GuidancePassage {
+  passage_id: string
+  source: string
+  publisher: string
+  where: string
+  url: string
+  text: string
+  quotes: string[]
+}
+
 export interface SarFacts {
   subject: { bank_id: string; account: string; jurisdiction: string | null }
   review_period: { start: string; end: string }
@@ -233,6 +243,7 @@ export interface CaseDetail {
     risk?: CaseRisk | null
     triggers?: Trigger[]
     case_file?: string
+    guidance?: GuidancePassage[]
   } | null
   error: string | null
   provider: string | null

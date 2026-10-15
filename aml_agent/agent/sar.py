@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from aml_agent.analysis.risk import RULE_BY_CODE
 from aml_agent.llm.base import ChatProvider
 
-SAR_VERSION = "s2"  # s2: no "filed" claims, red-flag scope, minute timestamps
+SAR_VERSION = "s3"  # s2: no "filed" claims, red-flag scope, minute timestamps
 FILING_DAYS = 30  # US rule: within 30 calendar days of detecting the suspicious activity
 MAX_AI_DRAFTS = 5
 SECTIONS = ("introduction", "subjects", "activity", "why_suspicious", "conclusion")
@@ -47,7 +47,9 @@ Write in the third person, past tense, plain and factual, the way an investigato
 for regulators. This is a draft for internal approval: never say that the report has been
 filed or submitted. The red flags describe all of the account's activity in the review
 period, not only the transactions in the evidence; say so if they mention activity the
-evidence does not show. Never use the long dash character (Unicode U+2014).
+evidence does not show. Where the FACTS include guidance quotes, you may refer to them in the
+"why_suspicious" section by naming the source (for example "FinCEN Advisory FIN-2014-A005").
+Never use the long dash character (Unicode U+2014).
 
 Reply with one JSON object and nothing else:
 {"introduction": "<two or three sentences: why the report is filed, the subject, the period
@@ -182,6 +184,11 @@ def facts(case: dict) -> dict:
             "limitations": draft.get("limitations"),
         },
         "decisions": decisions,
+        "guidance": [
+            {"source": p["source"], "where": p["where"], "url": p["url"], "quote": q}
+            for p in analysis.get("guidance") or []
+            for q in p.get("quotes", [])
+        ],
         "filing_due": due,
     }
 
@@ -206,6 +213,7 @@ def facts_text(f: dict) -> str:
         "red_flags",
         "ai_assessment",
         "decisions",
+        "guidance",
     )
     summary = json.dumps({k: f[k] for k in keys}, default=str, indent=1)
     return (
@@ -307,6 +315,11 @@ def markdown(sar: dict) -> str:
         lines.append(f"- Filing due: {f['filing_due']}")
     for key in SECTIONS:
         lines += ["", f"## {SECTION_TITLES[key]}", "", s[key]]
+    if f.get("guidance"):
+        lines += ["", "## Guidance referenced", ""]
+        lines += [
+            f'- "{g["quote"]}" ({g["source"]}, {g["where"]}; {g["url"]})' for g in f["guidance"]
+        ]
     lines += [
         "",
         "## Transactions",

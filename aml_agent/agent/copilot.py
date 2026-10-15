@@ -50,6 +50,8 @@ Rules:
   Call A0 "the subject" (never "the seed") and the others by their labels (A1, A2, ...).
 - Amounts are per currency. Never add or compare amounts in different currencies.
 - Cite transactions you rely on as "tx <id>", only IDs that the context or a tool returned.
+- For questions about typologies, red flags or reporting, search_guidance finds public AML
+  guidance (FinCEN, FFIEC); name the source and quote it exactly.
 - Answer in a few plain sentences or a short list. Say what you checked. If the tools
   cannot answer (customer background, purpose of payments), say so.
 - You advise; the analyst decides. Do not tell the analyst which decision to record.
@@ -65,6 +67,7 @@ TOOL_TEXT = {
     "get_transactions": "Read transactions",
     "get_account_behavior": "Checked account behavior",
     "get_transfers_among": "Read transfers between accounts",
+    "search_guidance": "Searched AML guidance",
 }
 
 

@@ -347,6 +347,7 @@ def _analysis(values: dict) -> dict:
         "aliases": values.get("aliases", {}),
         "triggers": values.get("triggers", []),
         "case_file": values.get("case_file"),
+        "guidance": values.get("guidance", []),
     }
 
 

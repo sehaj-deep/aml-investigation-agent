@@ -30,6 +30,15 @@ services:
       MCP_PORT: "8001"
       TOOLS_SHOW_PAYMENT_FORMAT: ${TOOLS_SHOW_PAYMENT_FORMAT:-true}
       TOOLS_SHOW_LATE_ROWS: ${TOOLS_SHOW_LATE_ROWS:-true}
+      # Guidance search: a read-only Postgres role (scripts/load_guidance.py) and the local
+      # embedding model in Ollama.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-aml}
+      GUIDANCE_READER_PASSWORD: ${GUIDANCE_READER_PASSWORD:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data/parquet:/data/parquet:ro
     healthcheck:
@@ -37,6 +46,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    depends_on:
+      postgres:
+        condition: service_healthy
     mem_limit: 2g
     restart: unless-stopped
 

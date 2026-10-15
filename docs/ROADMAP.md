@@ -43,7 +43,7 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 - **Investigator copilot** (built, decision 0016; its measured question set comes with the final evaluation). A chat agent attached to each case: the investigator asks questions ("who else did A4 pay?", "is this amount unusual for this account?", "show the money trail from A7") and the agent answers by calling the read-only MCP tools live, citing the transactions it used. Same controls as the case agent: bounded tools, step and token budgets, every call in the audit log, answers checked by the verifier, no write actions. Measured on a small set of scripted investigator questions with known answers (correct answer, tool calls, latency, cost).
 
 **E. Guidance retrieval** (was PRD Sprint 3)
-- Public AML typology guidance (FATF, FinCEN, FINTRAC), hybrid search, jurisdiction filter; narratives cite passages that are verified to exist.
+- Built (decision 0018): public FinCEN and FFIEC guidance (US government, public domain), hybrid search with pgvector, a read-only tool and database role; the review cites passages with quotes verified word for word. FATF and FINTRAC sources and a jurisdiction filter remain future work (licensing and coverage).
 
 **F. Case management UI (React)**
 - React, TypeScript and Vite, served as a `ui` container behind the existing API.

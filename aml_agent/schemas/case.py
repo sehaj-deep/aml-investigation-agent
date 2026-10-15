@@ -41,8 +41,14 @@ class HypothesisReply(_Strict):
     rationale: str = Field(min_length=1, max_length=2000)
 
 
+class GuidanceQuote(_Strict):
+    passage_id: str = Field(min_length=1, max_length=120)
+    quote: str = Field(min_length=3, max_length=400)
+
+
 class DraftReply(_Strict):
     summary: str = Field(min_length=1, max_length=4000)
+    guidance_citations: list[GuidanceQuote] = Field(default_factory=list, max_length=5)
     # Evidence is collected by code from the hypothesis accounts; IDs the model may still
     # list here are accepted and ignored.
     evidence_tx_ids: list[int] = Field(default_factory=list, max_length=100)
