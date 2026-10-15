@@ -72,6 +72,13 @@ By alert volume, the model's top 1,000 accounts are 96% laundering against 28% f
 
 **Results so far** (`docs/findings/2026-10-14-evidence-coverage.md`): small model, prompt p5, one run over 48 alerts: typology 50% (code's top candidate 54%; code 13 of 15, 87%, on the five typologies it targets); evidence coverage 63%, precision 53%; real alerts escalated 63%, closed 21%; benign alerts escalated 29%. Not yet measured with the risk indicators (prompt p7).
 
+**Final evaluation (2026-10-15, frozen at tag `eval-freeze`, `docs/findings/2026-10-15-final-evaluation.md`).** 150 monitoring alerts, 50 per priority band (55 laundering, 95 false alarms), gpt-oss:20b, prompt p10, one pass:
+- **Laundering:** escalated 49.1%, needs more information 18.2%, closed 32.7%.
+- **False alarms:** escalated 25.3%, needs more information 38.9%, closed 35.8%.
+- **Faithfulness:** every supporting transaction verified in 150 of 150 cases; 149 of 150 drafts valid; 186 of 280 guidance quotes verbatim and kept, 94 dropped by the check.
+- **Cost:** median 22,150 tokens and 49 seconds per case.
+- **Reading:** escalation carries a signal, but "close" does not. The AI alone would miss a third of laundering, which is why every case needs a recorded human decision.
+
 ## E. Guidance retrieval
 
 **Test set.** 18 investigator questions, each with the public guidance document that answers it (`evals/guidance_eval.py`).

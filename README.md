@@ -42,7 +42,7 @@ All figures are measured on synthetic data; details and caveats are in [`docs/SC
 | Evidence faithfulness | Every transaction the AI cites is verified against the source data: **288 of 288** injected corruptions caught, no false alarms on 24 clean cases |
 | Guidance retrieval (RAG) | Hybrid search puts the right document first **88.9%** of the time, against 77.8% for keywords alone; every quote is checked word for word |
 | Tool latency | Read-only graph queries: p95 222 ms in Docker |
-| AI analyst accuracy | **Pending.** Measured once, at the end, on a frozen evaluation set of 150 alerts |
+| AI analyst, 150 frozen alerts | Escalates real laundering **twice as often** as false alarms (49% vs 25%), but closes a third of laundering (33%), so every case keeps a human decision. Supporting evidence verified in **150 of 150** cases; the quote check dropped 94 of 280 non-verbatim guidance quotes. Median 49 s and 22k tokens per case |
 
 ## How the AI is kept honest
 
@@ -162,7 +162,7 @@ Design choices and their reasons are recorded in [`docs/decisions/`](docs/decisi
 - No customer data exists in the dataset, so SAR narratives identify accounts by bank and account number only.
 - The tools see every bank's transactions, which no single real institution can.
 - Roles are self-declared (no login): the four-eyes rule is a checked and audited workflow control, not authentication.
-- The AI analyst's accuracy is not yet measured; see the scorecard.
+- The AI analyst is not reliable at closing cases on its own (it closed 33% of laundering in the final evaluation); the product keeps a human decision on every case.
 
 See also [`docs/threat_model.md`](docs/threat_model.md).
 

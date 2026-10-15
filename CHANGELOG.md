@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased: final evaluation and public demo
+- Final AI-analyst evaluation on 150 frozen monitoring alerts (tag `eval-freeze`): laundering escalated 49% and closed 33%, false alarms escalated 25% and closed 36%; supporting evidence verified in every case; 94 of 280 guidance quotes dropped by the verbatim check.
+- Public demo on Render's free tier (single container, reviewed cases, live AI with daily limits).
+
 ## Unreleased: transaction monitoring
 - Open-source XGBoost transaction monitoring model on IBM's 60/20/20 time split: test F1 71.2% with payment format, 64.1% without (paper: 28.7% to 63.2%); rules 10.9%. Figures without the rows after Sep 10 reported alongside.
 - Alerts are accounts with suspicious transactions, each with its triggering transactions and top three SHAP factors; a seeded sample of 150 is the queue for the investigation evaluation.
