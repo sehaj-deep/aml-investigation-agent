@@ -64,10 +64,10 @@ All figures are measured on synthetic data; details and caveats are in [`docs/SC
 
 ```mermaid
 flowchart TB
-    subgraph Browser
+    subgraph browser [Browser]
         UI[React + TypeScript + Ant Design<br/>alert queue, case workspace,<br/>network graph, copilot, SAR]
     end
-    subgraph Docker Compose
+    subgraph compose [Docker Compose]
         API[FastAPI<br/>alerts, cases, decisions,<br/>copilot stream, SAR]
         W[Agent worker<br/>LangGraph workflow]
         MCP[MCP tool server<br/>read-only graph tools,<br/>search_guidance]
