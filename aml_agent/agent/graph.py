@@ -126,6 +126,11 @@ class CaseState(TypedDict, total=False):
 
 
 GUIDANCE_PASSAGES = 4
+TX_MENTION_RE = re.compile(r"\btx\s*#?\s*(\d{1,9})\b", re.I)
+
+
+def _mentioned_tx_ids(text: str) -> list[int]:
+    return list(dict.fromkeys(int(m.group(1)) for m in TX_MENTION_RE.finditer(text)))
 
 
 def _normalize(text: str) -> str:
@@ -545,6 +550,13 @@ def build_graph(
             limitations=_strip_em_dash(reply.limitations, warnings, "limitations"),
             guidance_citations=citations,
         )
+        # Transactions the narrative mentions must be ones a tool returned in this case;
+        # an invented reference (for example planted by injected text) is flagged.
+        mentioned = _mentioned_tx_ids(f"{case.summary} {case.limitations}")
+        seen = set(state["seen_tx_ids"]) | set(cited)
+        for tx in mentioned:
+            if tx not in seen:
+                warnings.append(f"UNVERIFIED_MENTION: tx {tx} is mentioned but no tool returned it")
         if hypothesis is None:
             warnings.append("pattern_hypothesis defaulted to none because the hypothesis failed")
         return {

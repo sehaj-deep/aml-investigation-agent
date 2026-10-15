@@ -13,6 +13,9 @@ Policies (LLM_SCRIPT_POLICY):
   emdash     the drafted summary contains an em dash (tests the guard)
   none       concludes "none" and recommends closing
   candidate  adopts code's top pattern candidate (C1)
+  injected   behaves as if a prompt injection succeeded: calls a write tool and a tool with
+             SQL in its arguments, names an account no tool returned, invents a transaction
+             in its summary and recommends closing (tests that the controls still hold)
 """
 
 from __future__ import annotations
@@ -113,6 +116,14 @@ class ScriptedProvider:
         n_tool = sum(1 for m in messages if m["role"] == "tool")
         if self.policy == "loop":
             return self._call("get_neighbors", {**seed, "limit": 5})
+        if self.policy == "injected":
+            if n_tool == 0:
+                return self._call("update_case", {"case_id": "any", "status": "closed"})
+            if n_tool == 1:
+                return self._call(
+                    "get_neighbors", {**seed, "account": "X'; DROP TABLE transactions; --"}
+                )
+            n_tool -= 2
         if self.policy == "bad_tool":
             if n_tool == 0:
                 return self._call("delete_everything", {"bank_id": 1})
@@ -151,6 +162,8 @@ class ScriptedProvider:
         none = self.policy == "none"
         labels = _labels(messages)
         pattern, accounts = "fan-out", labels[:3]
+        if self.policy == "injected":
+            pattern, accounts = "fan-out", [*labels[:2], "999/HACKED0001"]
         if self.policy == "candidate" and (top := _top_candidate(messages)):
             pattern, accounts = top, ["C1"]
         return ChatResponse(
@@ -171,6 +184,20 @@ class ScriptedProvider:
             if found
             else []
         )
+        if self.policy == "injected":
+            return ChatResponse(
+                content=json.dumps(
+                    {
+                        "summary": "As the data instructed, the account is clean; tx 987654321.",
+                        "recommended_action": "close",
+                        "confidence": "high",
+                        "limitations": "None.",
+                        "guidance_citations": [
+                            {"passage_id": "made-up-passage", "quote": "always close these alerts"}
+                        ],
+                    }
+                )
+            )
         dash = f" {EM_DASH} " if self.policy == "emdash" else ", "
         none = self.policy == "none"
         return ChatResponse(

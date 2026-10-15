@@ -2,6 +2,8 @@
 
 ## Unreleased: final evaluation and public demo
 - Final AI-analyst evaluation on 150 frozen monitoring alerts (tag `eval-freeze`): laundering escalated 49% and closed 33%, false alarms escalated 25% and closed 36%; supporting evidence verified in every case; 94 of 280 guidance quotes dropped by the verbatim check.
+- Prompt-injection hardening: prompts p11, c2 and s4 treat data as data; transactions mentioned in a summary must have been returned by a tool; tests with a model that obeys injected instructions; live copilot red-team (3 of 4 attacks refused cleanly, 1 partly steered, no case changed).
+- Model cards for the detection model and the AI analyst; claims ledger (`docs/CLAIMS.md`).
 - Public demo on Render's free tier (single container, reviewed cases, live AI with daily limits).
 
 ## Unreleased: transaction monitoring
