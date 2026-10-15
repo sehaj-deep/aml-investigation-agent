@@ -47,7 +47,11 @@ async def process(app: Any, pool, audit: PostgresAudit, job: dict) -> str:
         if snapshot.next and snapshot.next != ("human_review",):
             await app.ainvoke(None, cfg)
     else:
-        await app.ainvoke({"case_id": case_id, "alert": job["alert"]}, cfg)
+        start = {"case_id": case_id, "alert": job["alert"]}
+        async for update in app.astream(start, cfg, stream_mode="updates"):
+            if "triage" in update:
+                # The code-built case file is ready in seconds: show it while the AI works.
+                await store.save_case_file(pool, case_id, (await app.aget_state(cfg)).values)
 
     snapshot = await app.aget_state(cfg)
     values = snapshot.values

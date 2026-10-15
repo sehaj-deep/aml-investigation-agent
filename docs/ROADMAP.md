@@ -53,6 +53,9 @@ Every step stays read-only, bounded, logged in the append-only audit trail, and 
 
 **H. Later, optional: ML detection**
 - Done early, approved by the owner (2026-10-14): an open-source XGBoost transaction monitoring model on IBM's split, compared against the rules and the paper (decision 0013, scorecard part A). It generates the alert queue for the investigation evaluation.
+- Alert queue with on-demand AI review; alert policy at 84% of laundering accounts caught in validation (industry-typical false-alarm rate), with below-the-line testing (decision 0014). The evaluation sample takes 50 alerts per priority band.
+- Future: a harder evaluation queue from the model without payment format and with alerts up to Sep 10 only (today's alerts lean on ACH and the easy rows after Sep 10).
+- Future: AI triage of the low-priority band (29,143 alerts, 2.1% real), so analysts can focus while recall stays high.
 
 **G. Final evaluation and hardening**
 - Freeze, then run the untouched evaluation set once on the chosen model; report with repeats and spreads.

@@ -24,12 +24,17 @@ import json
 #     the simulator's pattern names. Pattern keys in the JSON are unchanged.
 # p7: the case file adds rules-based risk indicators (R1 to R6, a score and a band);
 #     the model weighs them with the network evidence when recommending an action.
-PROMPT_VERSION = "p7"
+# p8: alerts come from transaction monitoring: the case file starts with why the alert
+#     was raised (priority, score, reasons, flagged payments) and payment format is shown.
+#     Monitoring is tuned to catch most laundering, so most alerts are false alarms; a
+#     wrong close is worse than a wrong escalation. Below-the-line samples are marked.
+PROMPT_VERSION = "p8"
 
 SYSTEM = """You are an anti-money-laundering (AML) investigator working on SYNTHETIC data.
-You receive an alert: one seed account and a time window, and a CASE FILE that code has
-already assembled from the tools. Your job is to decide whether the seed account takes part
-in a laundering pattern, which pattern, and which accounts form it.
+You receive an alert raised by transaction monitoring: one seed account (the subject), a
+review window, the payments the monitoring model flagged and its reasons, and a CASE FILE
+that code has already assembled from the tools. Your job is to decide whether the seed
+account takes part in a laundering pattern, which pattern, and which accounts form it.
 
 Rules:
 - Use only the tools. You cannot see any data except what the tools return.
@@ -55,6 +60,12 @@ Pattern guide (the seed can be ANY member of a pattern, not only its center):
   middle group pays a final group.
 
 The case file:
+- starts with WHY THIS ALERT WAS RAISED: the monitoring model's priority, score and main
+  reasons, and the flagged payments. They explain why the account was flagged, not that it
+  launders: monitoring is tuned to catch most laundering, so most alerts are false alarms.
+  Priority "sample" marks a below-the-line sample: an account scored just under the alert
+  threshold and picked at random for review; judge it like any other alert.
+  Payment format is shown on transactions; a format alone (for example ACH) proves nothing;
 - labels accounts A0, A1, ... (A0 is the seed) and says how many distinct accounts pay
   each one and how many it pays in the window: a high count marks a hub;
 - lists the transfers between the seed, its counterparties (step 1) and their
@@ -72,7 +83,8 @@ The case file:
   riskiest first-time counterparty, with a score and a band (high, medium, low).
 
 How to investigate:
-1. Read the case file. Work out who pays whom: arrows point from sender to receiver.
+1. Read the case file, starting from the flagged payments: who the counterparties are and
+   how those payments fit the wider network. Arrows point from sender to receiver.
 2. Check the candidates against the transfers. Decide whether any of them is a real
    laundering pattern or ordinary activity, and whether a different reading fits better.
    The seed may be the center of the pattern or one member of it.
@@ -80,6 +92,8 @@ How to investigate:
    one-off payments. A coherent structure together with several red flags supports
    escalation; a structure with few red flags may be ordinary activity; when the
    network and the indicators disagree, say so and prefer "needs_more_info".
+   Missing real laundering is worse than escalating a false alarm: recommend "close" only
+   when the activity is clearly explained as ordinary.
 4. Use the tools only for what the case file lacks: an account it did not expand, a
    chain that continues past step 2 (trace_funds follows money up to 8 steps), or a
    detail you need. Many cases need no tool call at all.
@@ -90,10 +104,15 @@ How to investigate:
 When you have enough evidence, reply without calling a tool."""
 
 
+ALERT_KEYS = ("alert_id", "seed_bank", "seed_account", "window_start", "window_end")
+
+
 def triage_message(alert: dict, case_file: str) -> str:
+    # The monitoring details (score, reasons, flagged payments) are in the case file.
+    head = {k: alert[k] for k in ALERT_KEYS if k in alert}
     return (
         "New alert. Investigate the seed account (A0).\n"
-        f"<alert>\n{json.dumps(alert)}\n</alert>\n\n"
+        f"<alert>\n{json.dumps(head)}\n</alert>\n\n"
         f"{case_file}"
     )
 

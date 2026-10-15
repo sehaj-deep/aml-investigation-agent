@@ -1,5 +1,8 @@
-"""Cases and review API.
+"""Alert queue, cases and review API.
 
+Alerts come from transaction monitoring (scripts/train_detection.py) and are loaded
+into Postgres at startup when the table is empty (or with scripts/load_alerts.py).
+Opening an alert creates its case once; the worker then runs the AI review.
 There is deliberately no endpoint that finalizes a case: only the worker
 finalizes, and only after a decision recorded here.
 
@@ -8,17 +11,20 @@ finalizes, and only after a decision recorded here.
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from aml_agent import store
-from aml_agent.alerts.io import read_alerts
+from aml_agent.alerts.io import read_alerts, read_queue
 from aml_agent.alerts.models import Alert
 from aml_agent.audit import PostgresAudit, timeline, verify_chain
 from aml_agent.schemas.case import Decision
+
+log = logging.getLogger("aml_agent.api")
 
 
 class NewCase(BaseModel):
@@ -44,6 +50,9 @@ def create_app(pool=None) -> FastAPI:
         app.state.pool = p
         app.state.audit = PostgresAudit(p)
         await app.state.audit.init_schema()
+        if await store.count_alerts(p) == 0:
+            n = await store.load_alerts(p, (a.model_dump(mode="json") for a in read_queue()))
+            log.info("loaded %d monitoring alerts", n)
         yield
         await p.close()
 
@@ -70,13 +79,41 @@ def create_app(pool=None) -> FastAPI:
         return {"case_id": case_id, "status": "queued"}
 
     @app.get("/alerts")
-    async def list_alerts(alert_set: Literal["dev", "eval"] = "dev") -> list[dict]:
-        """Alert inputs only (seed and window); labels are never served."""
-        opened = {c["alert_id"]: c["case_id"] for c in await store.list_cases(app.state.pool)}
-        return [
-            {**a.model_dump(mode="json"), "case_id": opened.get(a.alert_id)}
-            for a in read_alerts(alert_set)
-        ]
+    async def list_alerts(
+        priority: Literal["high", "medium", "low", "sample"] | None = None,
+        status: str | None = None,
+        q: str | None = Query(None, max_length=40),
+        limit: int = Query(50, ge=1, le=200),
+        offset: int = Query(0, ge=0),
+    ) -> dict:
+        """One page of the monitoring alert queue, highest score first. Labels are
+        never served."""
+        return await store.list_alerts(app.state.pool, priority, status, q, limit, offset)
+
+    @app.get("/alerts/summary")
+    async def alert_summary() -> dict:
+        return await store.alert_summary(app.state.pool)
+
+    @app.get("/alerts/{alert_id}")
+    async def get_alert(alert_id: str) -> dict:
+        alert = await store.get_alert(app.state.pool, alert_id)
+        if alert is None:
+            raise HTTPException(404, "no such alert")
+        return alert
+
+    @app.post("/alerts/{alert_id}/open")
+    async def open_alert(alert_id: str) -> dict:
+        """The alert's case; the first open creates it and starts the AI review."""
+        opened = await store.open_alert(app.state.pool, alert_id)
+        if opened is None:
+            raise HTTPException(404, "no such alert")
+        case_id, created = opened
+        if created:
+            alert = await store.get_alert(app.state.pool, alert_id)
+            await app.state.audit.emit(
+                case_id, "case_created", {"alert": alert["alert"]}, actor="api"
+            )
+        return {"case_id": case_id, "created": created}
 
     @app.get("/cases")
     async def list_cases(status: str | None = None) -> list[dict]:

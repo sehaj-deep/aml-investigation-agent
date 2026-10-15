@@ -110,3 +110,15 @@ def test_metrics():
     out = dm.at_threshold(np.array([0.9, 0.8, 0.7, 0.1]), y, 0.75)
     assert (out["flagged"], out["precision"], out["recall"]) == (2, 0.5, 0.5)
     assert dm.best_threshold(np.array([0.9, 0.8, 0.7, 0.1]), y) == 0.7
+
+
+def test_alert_threshold_catches_the_recall_target():
+    np = pytest.importorskip("numpy")
+    dm = pytest.importorskip("aml_agent.detection.model")
+    scores = np.array([0.9, 0.8, 0.7, 0.6, 0.5, 0.4])
+    y = np.array([1, 0, 1, 0, 0, 1])
+    # Two of three positives are caught at 0.7; all three only at 0.4.
+    assert dm.recall_threshold(scores, y, 0.6) == 0.7
+    assert dm.recall_threshold(scores, y, 0.84) == 0.4
+    assert dm.recall_threshold(scores, y, 1.0) == 0.4
+    assert dm.BTL_FLOOR_RECALL > dm.RECALL_TARGET

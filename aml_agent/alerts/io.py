@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
+from aml_agent import config
 from aml_agent.alerts.models import Alert, GroundTruth
 
 ALERTS_DIR = Path(__file__).resolve().parents[2] / "evals" / "alerts"
 
 
 def _write_jsonl(path: Path, records: list) -> str:
-    text = "".join(r.model_dump_json() + "\n" for r in records)
+    text = "".join(r.model_dump_json(exclude_defaults=True) + "\n" for r in records)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8", newline="\n")
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -39,3 +41,16 @@ def read_truth(name: str, alerts_dir: Path = ALERTS_DIR) -> list[GroundTruth]:
     path = alerts_dir / "ground_truth" / f"{name}.jsonl"
     lines = path.read_text(encoding="utf-8").splitlines()
     return [GroundTruth.model_validate_json(line) for line in lines if line]
+
+
+def read_queue() -> Iterator[Alert]:
+    """The transaction monitoring alert queue (scripts/train_detection.py), highest
+    score first, read line by line (it has about 100,000 alerts). Empty if detection
+    has not been run."""
+    path = config.alert_queue_dir() / "alerts.jsonl"
+    if not path.exists():
+        return
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                yield Alert.model_validate_json(line)

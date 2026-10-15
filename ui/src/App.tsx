@@ -3,13 +3,11 @@ import {
   AlertOutlined,
   AuditOutlined,
   DashboardOutlined,
-  FolderOpenOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useUser, type Role } from './user'
-import CaseQueue from './pages/CaseQueue'
-import AlertInbox from './pages/AlertInbox'
+import AlertQueue from './pages/AlertQueue'
 import CaseWorkspace from './pages/CaseWorkspace'
 import Dashboard from './pages/Dashboard'
 import Governance from './pages/Governance'
@@ -17,17 +15,16 @@ import Governance from './pages/Governance'
 const { Header, Sider, Content } = Layout
 
 const NAV = [
-  { key: '/cases', icon: <FolderOpenOutlined />, label: 'Case queue' },
-  { key: '/alerts', icon: <AlertOutlined />, label: 'Alert inbox' },
+  { key: '/alerts', icon: <AlertOutlined />, label: 'Alert queue' },
   { key: '/dashboard', icon: <DashboardOutlined />, label: 'Operations' },
-  { key: '/governance', icon: <SafetyCertificateOutlined />, label: 'Model governance' },
+  { key: '/governance', icon: <SafetyCertificateOutlined />, label: 'Governance' },
 ]
 
 export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const user = useUser()
-  const selected = NAV.find((n) => location.pathname.startsWith(n.key))?.key ?? '/cases'
+  const selected = NAV.find((n) => location.pathname.startsWith(n.key))?.key ?? '/alerts'
 
   return (
     <Layout style={{ height: '100vh' }}>
@@ -72,13 +69,13 @@ export default function App() {
         </Sider>
         <Content style={{ overflow: 'auto' }}>
           <Routes>
-            <Route path="/" element={<Navigate to="/cases" replace />} />
-            <Route path="/cases" element={<CaseQueue />} />
+            <Route path="/" element={<Navigate to="/alerts" replace />} />
+            <Route path="/alerts" element={<AlertQueue />} />
+            <Route path="/cases" element={<Navigate to="/alerts" replace />} />
             <Route path="/cases/:caseId" element={<CaseWorkspace />} />
-            <Route path="/alerts" element={<AlertInbox />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/governance" element={<Governance />} />
-            <Route path="*" element={<Navigate to="/cases" replace />} />
+            <Route path="*" element={<Navigate to="/alerts" replace />} />
           </Routes>
         </Content>
       </Layout>

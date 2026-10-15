@@ -12,6 +12,17 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, model_validator
 
 
+class DetectionFactor(BaseModel):
+    """One reason behind a detection score (a SHAP contribution, in plain words)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    feature: str
+    label: str
+    value: float | None
+    contribution: float
+
+
 class Alert(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -20,6 +31,14 @@ class Alert(BaseModel):
     seed_account: str
     window_start: datetime
     window_end: datetime
+    # Set when transaction monitoring raised the alert (aml_agent/detection); labels are
+    # never part of an alert.
+    detection_score: float | None = None
+    detection_rank: int | None = None
+    # "sample": a below-the-line sample, scored just under the alert threshold.
+    priority: Literal["high", "medium", "low", "sample"] | None = None
+    trigger_tx_ids: tuple[int, ...] = ()
+    detection_factors: tuple[DetectionFactor, ...] = ()
 
     @model_validator(mode="after")
     def _window_order(self) -> Alert:

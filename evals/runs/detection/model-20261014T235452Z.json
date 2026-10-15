@@ -1,0 +1,394 @@
+{
+  "created_utc": "20261014T235452Z",
+  "model": "XGBoost transaction monitoring (aml_agent/detection)",
+  "split": "IBM AMLworld 60/20/20 by time",
+  "params": {
+    "objective": "binary:logistic",
+    "eval_metric": "aucpr",
+    "tree_method": "hist",
+    "max_depth": 7,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 5,
+    "seed": 7,
+    "nthread": 8
+  },
+  "negative_sample_in_training": 5,
+  "features": [
+    "amount_z",
+    "cross_currency",
+    "same_bank",
+    "self_transfer",
+    "hour",
+    "pair_prior_count",
+    "pair_reverse_prior_count",
+    "pair_period_count",
+    "hours_since_sender_received",
+    "hours_to_receiver_pays",
+    "format_ach",
+    "format_bitcoin",
+    "format_cash",
+    "format_cheque",
+    "format_credit_card",
+    "format_reinvestment",
+    "format_wire",
+    "sender_format_share",
+    "receiver_format_share",
+    "s_n_transfers",
+    "s_n_in",
+    "s_n_out",
+    "s_n_cp",
+    "s_receives_and_pays",
+    "s_currency_switch",
+    "s_new_counterparty_share",
+    "s_one_time_counterparty_share",
+    "s_period_activity_share",
+    "s_onward_within_24h_share",
+    "s_rule_score",
+    "s_top_counterparty_score",
+    "s_senders",
+    "s_receivers",
+    "s_one_off_senders",
+    "s_one_off_receivers",
+    "s_reciprocal_counterparties",
+    "s_currencies_in",
+    "s_currencies_out",
+    "s_amount_z_mean",
+    "s_amount_z_max",
+    "s_amount_z_min",
+    "s_amount_z_std",
+    "s_active_hours_span",
+    "s_transfers_per_active_day",
+    "s_median_hours_to_onward",
+    "s_cp_rule_score_mean",
+    "s_cp_rule_score_max",
+    "s_cp_currency_switch_count",
+    "s_cp_degree_max",
+    "s_cp_one_time_share_mean",
+    "r_n_transfers",
+    "r_n_in",
+    "r_n_out",
+    "r_n_cp",
+    "r_receives_and_pays",
+    "r_currency_switch",
+    "r_new_counterparty_share",
+    "r_one_time_counterparty_share",
+    "r_period_activity_share",
+    "r_onward_within_24h_share",
+    "r_rule_score",
+    "r_top_counterparty_score",
+    "r_senders",
+    "r_receivers",
+    "r_one_off_senders",
+    "r_one_off_receivers",
+    "r_reciprocal_counterparties",
+    "r_currencies_in",
+    "r_currencies_out",
+    "r_amount_z_mean",
+    "r_amount_z_max",
+    "r_amount_z_min",
+    "r_amount_z_std",
+    "r_active_hours_span",
+    "r_transfers_per_active_day",
+    "r_median_hours_to_onward",
+    "r_cp_rule_score_mean",
+    "r_cp_rule_score_max",
+    "r_cp_currency_switch_count",
+    "r_cp_degree_max",
+    "r_cp_one_time_share_mean"
+  ],
+  "periods": {
+    "train": [
+      [
+        "2022-09-01T00:00:00",
+        "2022-09-03T23:59:00"
+      ],
+      [
+        "2022-09-04T00:00:00",
+        "2022-09-06T13:35:00"
+      ]
+    ],
+    "validation": [
+      "2022-09-06T13:36:00",
+      "2022-09-08T16:11:00"
+    ],
+    "test": [
+      "2022-09-08T16:12:00",
+      "2022-09-18T23:59:00"
+    ]
+  },
+  "rows": {
+    "train_sampled": 610060,
+    "train_laundering": 1988,
+    "validation": 1010642,
+    "validation_laundering": 947,
+    "test": 1015882,
+    "test_laundering": 1798,
+    "test_after_sep_10": 1108,
+    "test_laundering_after_sep_10": 655
+  },
+  "transaction_level_test": [
+    {
+      "scorer": "model",
+      "average_precision": 0.7091,
+      "validation_average_precision": 0.5477,
+      "threshold_from_validation": {
+        "threshold": 0.87867,
+        "flagged": 1311,
+        "true_flagged": 1106,
+        "precision": 0.8436,
+        "recall": 0.6151,
+        "f1": 0.7115
+      },
+      "best_on_test_optimistic": {
+        "precision": 0.8533,
+        "recall": 0.6112,
+        "f1": 0.7122
+      },
+      "without_rows_after_sep_10": {
+        "threshold": 0.87867,
+        "flagged": 739,
+        "true_flagged": 554,
+        "precision": 0.7497,
+        "recall": 0.4847,
+        "f1": 0.5887
+      },
+      "best_iteration": 182
+    },
+    {
+      "scorer": "model_without_format",
+      "average_precision": 0.6254,
+      "validation_average_precision": 0.5167,
+      "threshold_from_validation": {
+        "threshold": 0.87503,
+        "flagged": 1281,
+        "true_flagged": 987,
+        "precision": 0.7705,
+        "recall": 0.5489,
+        "f1": 0.6411
+      },
+      "best_on_test_optimistic": {
+        "precision": 0.7677,
+        "recall": 0.5551,
+        "f1": 0.6443
+      },
+      "without_rows_after_sep_10": {
+        "threshold": 0.87503,
+        "flagged": 764,
+        "true_flagged": 482,
+        "precision": 0.6309,
+        "recall": 0.4217,
+        "f1": 0.5055
+      },
+      "best_iteration": 218
+    },
+    {
+      "scorer": "rules",
+      "average_precision": 0.0604,
+      "validation_average_precision": 0.0433,
+      "threshold_from_validation": {
+        "threshold": 7.0,
+        "flagged": 5004,
+        "true_flagged": 369,
+        "precision": 0.0737,
+        "recall": 0.2052,
+        "f1": 0.1085
+      },
+      "best_on_test_optimistic": {
+        "precision": 0.2573,
+        "recall": 0.0979,
+        "f1": 0.1418
+      },
+      "without_rows_after_sep_10": {
+        "threshold": 7.0,
+        "flagged": 4535,
+        "true_flagged": 185,
+        "precision": 0.0408,
+        "recall": 0.1619,
+        "f1": 0.0652
+      }
+    }
+  ],
+  "account_level_test": {
+    "accounts": 356396,
+    "laundering_accounts": 2201,
+    "alert_policy": {
+      "recall_target_on_validation": 0.84,
+      "threshold": 0.29303
+    },
+    "alerted": 31518,
+    "alerted_laundering": 1968,
+    "account_recall": 0.8941,
+    "transaction_recall": 0.8871,
+    "priority_bands": {
+      "high": {
+        "threshold": 0.92217,
+        "alerts": 1224,
+        "laundering": 1095
+      },
+      "medium": {
+        "threshold": 0.80165,
+        "alerts": 1151,
+        "laundering": 252
+      },
+      "low": {
+        "threshold": 0.29303,
+        "alerts": 29143,
+        "laundering": 621
+      }
+    },
+    "below_the_line_testing": {
+      "zone": {
+        "from_score": 0.03251,
+        "to_score": 0.29303,
+        "floor_recall_on_validation": 0.95,
+        "accounts": 68332,
+        "laundering_accounts": 225
+      },
+      "sample": 250,
+      "sample_laundering": 2,
+      "seed": 20261015
+    },
+    "alert_budgets": [
+      {
+        "scorer": "model",
+        "alerts": 100,
+        "true_cases": 100,
+        "precision": 1.0,
+        "recall": 0.0454
+      },
+      {
+        "scorer": "model",
+        "alerts": 250,
+        "true_cases": 250,
+        "precision": 1.0,
+        "recall": 0.1136
+      },
+      {
+        "scorer": "model",
+        "alerts": 500,
+        "true_cases": 500,
+        "precision": 1.0,
+        "recall": 0.2272
+      },
+      {
+        "scorer": "model",
+        "alerts": 1000,
+        "true_cases": 960,
+        "precision": 0.96,
+        "recall": 0.4362
+      },
+      {
+        "scorer": "model",
+        "alerts": 2000,
+        "true_cases": 1308,
+        "precision": 0.654,
+        "recall": 0.5943
+      },
+      {
+        "scorer": "rules",
+        "alerts": 100,
+        "true_cases": 98,
+        "precision": 0.98,
+        "recall": 0.0445
+      },
+      {
+        "scorer": "rules",
+        "alerts": 250,
+        "true_cases": 169,
+        "precision": 0.676,
+        "recall": 0.0768
+      },
+      {
+        "scorer": "rules",
+        "alerts": 500,
+        "true_cases": 221,
+        "precision": 0.442,
+        "recall": 0.1004
+      },
+      {
+        "scorer": "rules",
+        "alerts": 1000,
+        "true_cases": 279,
+        "precision": 0.279,
+        "recall": 0.1268
+      },
+      {
+        "scorer": "rules",
+        "alerts": 2000,
+        "true_cases": 387,
+        "precision": 0.1935,
+        "recall": 0.1758
+      }
+    ]
+  },
+  "top_features_by_gain": [
+    [
+      "format_ach",
+      2897.5
+    ],
+    [
+      "cross_currency",
+      1836.29
+    ],
+    [
+      "pair_period_count",
+      648.47
+    ],
+    [
+      "self_transfer",
+      640.59
+    ],
+    [
+      "s_one_off_receivers",
+      587.01
+    ],
+    [
+      "s_n_transfers",
+      562.69
+    ],
+    [
+      "r_reciprocal_counterparties",
+      442.2
+    ],
+    [
+      "r_cp_currency_switch_count",
+      324.02
+    ],
+    [
+      "s_currencies_out",
+      269.83
+    ],
+    [
+      "s_reciprocal_counterparties",
+      257.81
+    ],
+    [
+      "s_n_out",
+      219.73
+    ],
+    [
+      "pair_reverse_prior_count",
+      209.8
+    ],
+    [
+      "format_cheque",
+      192.3
+    ],
+    [
+      "format_credit_card",
+      180.47
+    ],
+    [
+      "s_n_cp",
+      167.73
+    ]
+  ],
+  "evaluation_sample": {
+    "alerts": 150,
+    "seed": 20261014,
+    "laundering": 55
+  },
+  "seconds": 678.5
+}

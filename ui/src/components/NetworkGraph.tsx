@@ -17,7 +17,7 @@ const HOP_COLOR: Record<string, string> = {
 }
 
 function shortAccount(n: GraphNode) {
-  return `${n.label}\n${n.bank_id}/${n.account}`
+  return `${n.label === 'A0' ? 'Subject' : n.label}\n${n.bank_id}/${n.account}`
 }
 
 export default function NetworkGraph({ graph, evidenceTxIds, highlight }: Props) {
@@ -140,12 +140,12 @@ export default function NetworkGraph({ graph, evidenceTxIds, highlight }: Props)
     <div>
       <div ref={ref} className="network" />
       <Space size={12} wrap style={{ marginTop: 6, fontSize: 12 }}>
-        <span><Tag color="#c05621">A0</Tag>subject</span>
-        <span><Tag color="#1d4e89">1</Tag>direct counterparty</span>
-        <span><Tag color="#7a8aa0">2</Tag>second-degree counterparty</span>
-        <span><Tag color="#6b46c1">T</Tag>found by money trace</span>
-        <span>dashed: first-time counterparty (1 to 2 transfers)</span>
-        <span style={{ color: '#c53030' }}>red: supporting transactions</span>
+        <span><Tag color="#c05621">&nbsp;</Tag>subject account</span>
+        <span><Tag color="#1d4e89">&nbsp;</Tag>deals directly with the subject</span>
+        <span><Tag color="#7a8aa0">&nbsp;</Tag>one step further</span>
+        <span><Tag color="#6b46c1">&nbsp;</Tag>found by following the money</span>
+        <span>dashed line: new relationship (1 or 2 payments)</span>
+        <span style={{ color: '#c53030' }}>red line: supporting transactions</span>
         <span>red ring: highlighted accounts</span>
       </Space>
       {selected && (
@@ -154,7 +154,8 @@ export default function NetworkGraph({ graph, evidenceTxIds, highlight }: Props)
             <>
               <Descriptions.Item label="Account">
                 <Typography.Text className="mono">
-                  {selected.node.label} = {selected.node.bank_id}/{selected.node.account}
+                  {selected.node.label === 'A0' ? 'Subject' : selected.node.label} ={' '}
+                  {selected.node.bank_id}/{selected.node.account}
                 </Typography.Text>
               </Descriptions.Item>
               <Descriptions.Item label="Jurisdiction">{selected.node.jurisdiction ?? 'n/a'}</Descriptions.Item>
@@ -164,7 +165,8 @@ export default function NetworkGraph({ graph, evidenceTxIds, highlight }: Props)
           ) : (
             <>
               <Descriptions.Item label="Flow">
-                {selected.edge.src} to {selected.edge.dst}
+                {selected.edge.src === 'A0' ? 'Subject' : selected.edge.src} to{' '}
+                {selected.edge.dst === 'A0' ? 'Subject' : selected.edge.dst}
               </Descriptions.Item>
               <Descriptions.Item label="Transfers">{selected.edge.n_tx}</Descriptions.Item>
               <Descriptions.Item label="Totals">

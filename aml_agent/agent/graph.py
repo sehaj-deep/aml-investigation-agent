@@ -80,6 +80,7 @@ class CaseState(TypedDict, total=False):
     case_graph: dict
     candidates: list[dict]
     risk: dict
+    triggers: list[dict]
     steps: int
     tool_calls: int
     round_steps: int
@@ -180,6 +181,7 @@ def build_graph(
             "case_graph": case_file.graph,
             "candidates": case_file.candidates,
             "risk": case_file.risk,
+            "triggers": case_file.triggers,
             "evidence_rows": [],
             "steps": 0,
             "tool_calls": 0,

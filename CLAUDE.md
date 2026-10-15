@@ -52,6 +52,7 @@ Activate the venv first (`.venv/Scripts/activate`). `make` is not installed on t
 - Relock dependencies: `python scripts/lock.py` (adds Windows-only markers; never run plain pip-compile)
 - Stack: `docker compose up -d --wait` starts postgres, mcp-graph, api (http://127.0.0.1:8000) and agent-worker
 - Local processes: `python -m aml_agent.tools.mcp_server --http`, `python -m aml_agent.api`, `python -m aml_agent.worker` (on Windows set `MCP_URL`)
+- Detection and alert queue: `python scripts/train_detection.py` (about 8 minutes; needs `requirements-detection.txt`), then `python scripts/load_alerts.py` (the API also loads the queue at startup when its table is empty)
 - Bake-off (dev alerts only): `python scripts/bakeoff.py --models <tag1>,<tag2> --n 20`
 - Docker tests: `python -m pytest -m docker` (uses database `aml_test`)
 - Dev-set evaluation: `python evals/run_evals.py --set dev` (the eval set is refused until tag `eval-freeze` exists)

@@ -38,7 +38,7 @@ Transaction level, test period Sep 8 16:12 to Sep 10 (989,187 transactions, 1,07
 
 **Results (2026-10-14, transaction monitoring model, `docs/decisions/0013-transaction-monitoring.md`)**
 
-An open-source XGBoost model scores every transaction from the payment itself (amount for its currency, currency change, payment format, timing, earlier dealings between the two accounts) and from the sender's and receiver's account features for the review period. Split: IBM's benchmark split, 60/20/20 of all transactions by time (train Sep 1 to Sep 6 13:35, validation to Sep 8 16:11, test to Sep 18, including the rows after Sep 10). The alert threshold is chosen on validation and applied once to test. Run: `python scripts/train_detection.py` (about 7 minutes, no language model). Results: `evals/runs/detection/model-20261014T221718Z.json`.
+An open-source XGBoost model scores every transaction from the payment itself (amount for its currency, currency change, payment format, timing, earlier dealings between the two accounts) and from the sender's and receiver's account features for the review period. Split: IBM's benchmark split, 60/20/20 of all transactions by time (train Sep 1 to Sep 6 13:35, validation to Sep 8 16:11, test to Sep 18, including the rows after Sep 10). The alert threshold is chosen on validation and applied once to test. Run: `python scripts/train_detection.py` (about 7 minutes, no language model). Results: `evals/runs/detection/model-20261014T235452Z.json` (identical metrics to the first run of this model, 221718Z).
 
 Test period: 1,015,882 transactions, 1,798 laundering (0.18%); 1,108 rows fall after Sep 10, and 655 of them are laundering.
 
@@ -50,7 +50,9 @@ Test period: 1,015,882 transactions, 1,798 laundering (0.18%); 1,108 rows fall a
 
 The paper's models on the same split and metric (minority-class F1, HI-Small; Altman et al., NeurIPS 2023, Table 2): GIN 28.7% to XGBoost with graph features 63.2%.
 
-Accounts (an account is alerted when any of its test transactions passes the threshold): 1,516 accounts alerted, 1,223 of them laundering (81%), out of 2,201 laundering accounts (56% caught). By alert volume, the model's top 1,000 accounts are 96% laundering against 28% for the rules.
+By alert volume, the model's top 1,000 accounts are 96% laundering against 28% for the rules.
+
+**Alert policy** (`docs/decisions/0014-alert-queue-and-alert-policy.md`). The F1 threshold above is for the paper comparison only. The platform alerts at the score that caught 84% of laundering accounts in validation, the most it can catch at an industry-typical false-alarm rate (98% would triple the alerts at 97.6% false). On the test period this alerts 31,518 of 356,396 active accounts and catches 1,968 of 2,201 laundering accounts (89.4%); 93.8% of alerts are false. Priority bands order the work: high 1,224 alerts (89.5% real), medium 1,151 (21.9%), low 29,143 (2.1%). Below-the-line testing: the 68,332 accounts just under the threshold hold 225 laundering accounts (0.33%); a random sample of 250 of them is reviewed like alerts (it found 2). Results: `evals/runs/detection/model-20261014T235452Z.json`.
 
 **Reading.**
 - On IBM's split and metric the model scores above the paper's best reported model, with or without payment format. The threshold chosen on validation is almost the best possible on test (71.15% against a best of 71.22%), so the result is not tuned on the test set.

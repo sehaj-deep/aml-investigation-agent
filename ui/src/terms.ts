@@ -89,3 +89,41 @@ export const DECISION_PAST = {
   reject: 'Overrode the AI recommendation',
   request_more: 'Returned the case for more analysis',
 } as const
+
+// Alert priority from transaction monitoring. Every alert is worked; the band only
+// orders the queue. Shares are from the model's validation period.
+export const PRIORITY: Record<
+  'high' | 'medium' | 'low' | 'sample',
+  { name: string; color: string; description: string }
+> = {
+  high: {
+    name: 'High',
+    color: '#c53030',
+    description: 'Highest risk: in testing, about 9 in 10 payments flagged at this level were laundering.',
+  },
+  medium: {
+    name: 'Medium',
+    color: '#dd6b20',
+    description: 'Elevated risk: in testing, about half of the payments flagged at this level were laundering.',
+  },
+  low: {
+    name: 'Low',
+    color: '#718096',
+    description: 'Lower risk, still alerted: most of these are false alarms, as in any bank monitoring.',
+  },
+  sample: {
+    name: 'Below the line',
+    color: '#2b6cb0',
+    description:
+      'Below-the-line testing: a random sample of accounts scored just under the alert threshold, reviewed to measure what monitoring misses.',
+  },
+}
+
+// A detection reason in plain words, with its value when the value is a count or a size
+// (yes/no reasons such as "payment by ACH" need no value).
+const YES_NO = /^(format_|cross_currency$|same_bank$|self_transfer$|[sr]_(receives_and_pays|currency_switch)$)/
+
+export function factorText(f: { feature: string; label: string; value: number | null }): string {
+  if (f.value === null || YES_NO.test(f.feature)) return f.label
+  return `${f.label}: ${Number(f.value.toFixed(2)).toLocaleString()}`
+}

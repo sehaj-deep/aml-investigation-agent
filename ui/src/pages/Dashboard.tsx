@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Card, Col, Progress, Row, Space, Statistic, Typography } from 'antd'
 import { api } from '../api'
-import { RECOMMENDATION, typologyName } from '../terms'
+import { PRIORITY, RECOMMENDATION, typologyName } from '../terms'
 import { statusText } from '../components/badges'
 
 function Breakdown({
@@ -33,6 +33,11 @@ function Breakdown({
 
 export default function Dashboard() {
   const { data, error } = useQuery({ queryKey: ['stats'], queryFn: api.stats, refetchInterval: 10000 })
+  const { data: q } = useQuery({
+    queryKey: ['alert-summary'],
+    queryFn: api.alertSummary,
+    refetchInterval: 10000,
+  })
   const s = data
   const total = s ? Object.values(s.by_status).reduce((a, b) => a + b, 0) : 0
   const open = s
@@ -48,7 +53,26 @@ export default function Dashboard() {
         <Row gutter={12}>
           <Col span={6}>
             <Card size="small">
-              <Statistic title="Cases" value={total} />
+              <Statistic title="Alerts in the queue" value={q?.total ?? 0} />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card size="small">
+              <Statistic title="Not opened yet" value={q?.by_status.new ?? 0} />
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Breakdown
+              title="Alerts by priority"
+              data={q?.by_priority ?? {}}
+              label={(k) => PRIORITY[k as keyof typeof PRIORITY]?.name ?? k}
+            />
+          </Col>
+        </Row>
+        <Row gutter={12}>
+          <Col span={6}>
+            <Card size="small">
+              <Statistic title="Opened alerts (cases)" value={total} />
             </Card>
           </Col>
           <Col span={6}>
@@ -58,13 +82,13 @@ export default function Dashboard() {
           </Col>
           <Col span={6}>
             <Card size="small">
-              <Statistic title="Pending analyst review" value={s?.by_status.pending_review ?? 0} />
+              <Statistic title="Ready for review" value={s?.by_status.pending_review ?? 0} />
             </Card>
           </Col>
           <Col span={6}>
             <Card size="small">
               <Statistic
-                title="Cases with verified support"
+                title="Cases with checked evidence"
                 value={s ? s.verification.faithful : 0}
                 suffix={`/ ${s?.verification.checked ?? 0}`}
               />
@@ -83,7 +107,7 @@ export default function Dashboard() {
             />
           </Col>
           <Col span={8}>
-            <Breakdown title="Typology (AI)" data={s?.by_pattern ?? {}} label={typologyName} />
+            <Breakdown title="Suspected pattern (AI)" data={s?.by_pattern ?? {}} label={typologyName} />
           </Col>
         </Row>
         <Row gutter={12}>

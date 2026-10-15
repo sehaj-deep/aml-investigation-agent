@@ -4,7 +4,10 @@
 - Open-source XGBoost transaction monitoring model on IBM's 60/20/20 time split: test F1 71.2% with payment format, 64.1% without (paper: 28.7% to 63.2%); rules 10.9%. Figures without the rows after Sep 10 reported alongside.
 - Alerts are accounts with suspicious transactions, each with its triggering transactions and top three SHAP factors; a seeded sample of 150 is the queue for the investigation evaluation.
 - Tools show payment format and every date by default, as an analyst sees them.
-- Decision records 0012 (first, account-level version) and 0013; scorecard part A updated.
+- Alert policy: the threshold catches 84% of laundering accounts in validation at an industry-typical false-alarm rate; on test, 89.4% of laundering accounts are alerted (31,518 alerts, 93.8% false, in high, medium and low priority bands). Below-the-line testing: a random sample of 250 accounts just under the threshold is reviewed to measure misses.
+- One alert queue (Postgres, paged): every alert shows its priority, reasons and flagged payments before it is opened; opening it starts the AI review, and the code-built evidence appears within seconds.
+- Plain-language case screen and history; model and instruction versions only on the Governance page. Prompt p8 reads why the alert was raised.
+- Decision records 0012 (first, account-level version), 0013 and 0014; scorecard part A updated.
 
 ## Unreleased: Sprint 2 (audit and faithfulness), pending owner review and a live model
 - Append-only, hash-chained audit log of every model call, tool call, state change and decision; UPDATE, DELETE and TRUNCATE blocked; a case rebuilt from the log alone matches the live run exactly.

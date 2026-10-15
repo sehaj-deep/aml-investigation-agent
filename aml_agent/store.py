@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Iterable
 from typing import Any
 
 from psycopg.rows import dict_row
@@ -47,6 +48,22 @@ CREATE INDEX IF NOT EXISTS cases_status_idx ON cases (status, updated_at);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS verification JSONB;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS case_graph JSONB;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS analysis JSONB;
+CREATE TABLE IF NOT EXISTS alerts (
+    alert_id     TEXT PRIMARY KEY,
+    seed_bank    INTEGER NOT NULL,
+    seed_account TEXT NOT NULL,
+    window_start TIMESTAMP NOT NULL,
+    window_end   TIMESTAMP NOT NULL,
+    score        DOUBLE PRECISION,
+    rank         INTEGER,
+    priority     TEXT,
+    n_triggers   INTEGER NOT NULL DEFAULT 0,
+    alert        JSONB NOT NULL,
+    loaded_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS alerts_rank_idx ON alerts (rank);
+CREATE INDEX IF NOT EXISTS alerts_priority_idx ON alerts (priority, rank);
+CREATE INDEX IF NOT EXISTS cases_alert_idx ON cases (alert_id, created_at);
 CREATE TABLE IF NOT EXISTS decisions (
     decision_id BIGSERIAL PRIMARY KEY,
     case_id     TEXT NOT NULL REFERENCES cases (case_id),
@@ -97,6 +114,197 @@ async def create_case(pool: AsyncConnectionPool, alert: dict[str, Any]) -> str:
             [case_id, alert["alert_id"], Jsonb(alert)],
         )
     return case_id
+
+
+async def load_alerts(pool: AsyncConnectionPool, alerts: Iterable[dict[str, Any]]) -> int:
+    """Replace the monitoring queue with these alerts (alert JSON as in Alert),
+    streamed, so the whole queue is never held in memory."""
+    n = 0
+    async with pool.connection() as conn, conn.transaction():
+        await conn.execute(
+            "CREATE TEMP TABLE alerts_in (LIKE alerts INCLUDING DEFAULTS) ON COMMIT DROP"
+        )
+        cur = conn.cursor()
+        async with cur.copy(
+            "COPY alerts_in (alert_id, seed_bank, seed_account, window_start, window_end, "
+            "score, rank, priority, n_triggers, alert) FROM STDIN"
+        ) as copy:
+            for a in alerts:
+                await copy.write_row(
+                    [
+                        a["alert_id"],
+                        a["seed_bank"],
+                        a["seed_account"],
+                        a["window_start"],
+                        a["window_end"],
+                        a.get("detection_score"),
+                        a.get("detection_rank"),
+                        a.get("priority"),
+                        len(a.get("trigger_tx_ids") or []),
+                        Jsonb(a),
+                    ]
+                )
+                n += 1
+        await conn.execute(
+            """
+            INSERT INTO alerts SELECT * FROM alerts_in
+            ON CONFLICT (alert_id) DO UPDATE SET
+                seed_bank = EXCLUDED.seed_bank, seed_account = EXCLUDED.seed_account,
+                window_start = EXCLUDED.window_start, window_end = EXCLUDED.window_end,
+                score = EXCLUDED.score, rank = EXCLUDED.rank, priority = EXCLUDED.priority,
+                n_triggers = EXCLUDED.n_triggers, alert = EXCLUDED.alert,
+                loaded_at = EXCLUDED.loaded_at
+            """
+        )
+        # The queue is replaced as a whole: alerts no longer raised leave it (their cases,
+        # if any, keep a copy of the alert).
+        await conn.execute(
+            "DELETE FROM alerts WHERE alert_id NOT IN (SELECT alert_id FROM alerts_in)"
+        )
+    return n
+
+
+async def count_alerts(pool: AsyncConnectionPool) -> int:
+    async with pool.connection() as conn:
+        row = await (await conn.execute("SELECT count(*) AS n FROM alerts")).fetchone()
+        return row["n"]
+
+
+# An alert's work status comes from its latest case; "new" when nobody opened it yet.
+_ALERT_ROWS = """
+    SELECT a.alert_id, a.seed_bank, a.seed_account, a.window_start, a.window_end,
+           a.score, a.rank, a.priority, a.n_triggers,
+           a.alert->'detection_factors' AS reasons,
+           c.case_id, COALESCE(c.status, 'new') AS status,
+           c.draft->>'recommended_action' AS recommended_action,
+           c.draft->>'pattern_hypothesis' AS pattern,
+           c.updated_at AS case_updated_at
+    FROM alerts a
+    LEFT JOIN LATERAL (
+        SELECT case_id, status, draft, updated_at FROM cases
+        WHERE cases.alert_id = a.alert_id ORDER BY created_at DESC LIMIT 1
+    ) c ON true
+"""
+
+
+async def list_alerts(
+    pool: AsyncConnectionPool,
+    priority: str | None = None,
+    status: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """One page of the alert queue, highest score first, with its total size."""
+    where, params = [], []
+    if priority:
+        where.append("priority = %s")
+        params.append(priority)
+    if status == "open":
+        where.append("status NOT IN ('approved', 'rejected')")
+    elif status:
+        where.append("status = %s")
+        params.append(status)
+    if search:
+        where.append("(alert_id ILIKE %s OR seed_account ILIKE %s OR case_id ILIKE %s)")
+        params += [f"%{search}%"] * 3
+    clause = f"WHERE {' AND '.join(where)}" if where else ""
+    sql = f"SELECT * FROM ({_ALERT_ROWS}) q {clause}"
+    async with pool.connection() as conn:
+        total = await (
+            await conn.execute(f"SELECT count(*) AS n FROM ({sql}) t", params)
+        ).fetchone()
+        items = await (
+            await conn.execute(f"{sql} ORDER BY rank LIMIT %s OFFSET %s", [*params, limit, offset])
+        ).fetchall()
+    return {"total": total["n"], "items": items}
+
+
+async def get_alert(pool: AsyncConnectionPool, alert_id: str) -> dict | None:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                f"SELECT q.*, a.alert FROM ({_ALERT_ROWS}) q "
+                "JOIN alerts a USING (alert_id) WHERE alert_id = %s",
+                [alert_id],
+            )
+        ).fetchone()
+        return row
+
+
+async def open_alert(pool: AsyncConnectionPool, alert_id: str) -> tuple[str, bool] | None:
+    """The alert's case, created (queued for the AI review) on first open.
+
+    Returns (case_id, created), or None if the alert does not exist. Concurrent opens of
+    the same alert get the same case.
+    """
+    async with pool.connection() as conn, conn.transaction():
+        await conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [alert_id])
+        alert = await (
+            await conn.execute("SELECT alert FROM alerts WHERE alert_id = %s", [alert_id])
+        ).fetchone()
+        if alert is None:
+            return None
+        case = await (
+            await conn.execute(
+                "SELECT case_id FROM cases WHERE alert_id = %s ORDER BY created_at DESC LIMIT 1",
+                [alert_id],
+            )
+        ).fetchone()
+        if case:
+            return case["case_id"], False
+        case_id = f"case-{uuid.uuid4().hex[:12]}"
+        await conn.execute(
+            "INSERT INTO cases (case_id, alert_id, alert, status) VALUES (%s, %s, %s, 'queued')",
+            [case_id, alert_id, Jsonb(alert["alert"])],
+        )
+        return case_id, True
+
+
+async def alert_summary(pool: AsyncConnectionPool) -> dict:
+    """Queue counts by priority and by work status, for the operations dashboard."""
+    async with pool.connection() as conn:
+        rows = await (
+            await conn.execute(
+                f"SELECT priority, status, count(*) AS n FROM ({_ALERT_ROWS}) q GROUP BY 1, 2"
+            )
+        ).fetchall()
+    by_priority: dict[str, int] = {}
+    by_status: dict[str, int] = {}
+    for r in rows:
+        by_priority[r["priority"] or "none"] = by_priority.get(r["priority"] or "none", 0) + r["n"]
+        by_status[r["status"]] = by_status.get(r["status"], 0) + r["n"]
+    return {"total": sum(by_status.values()), "by_priority": by_priority, "by_status": by_status}
+
+
+async def save_case_file(pool: AsyncConnectionPool, case_id: str, values: dict) -> None:
+    """Store the code-built case file as soon as it exists, while the AI review runs."""
+    async with pool.connection() as conn:
+        await conn.execute(
+            """
+            UPDATE cases SET case_graph = %s, analysis = %s, provider = %s, model = %s,
+                   prompt_version = %s, updated_at = now()
+            WHERE case_id = %s
+            """,
+            [
+                Jsonb(values.get("case_graph")),
+                Jsonb(_analysis(values)),
+                values.get("provider"),
+                values.get("model"),
+                values.get("prompt_version"),
+                case_id,
+            ],
+        )
+
+
+def _analysis(values: dict) -> dict:
+    return {
+        "hypothesis": values.get("hypothesis"),
+        "candidates": values.get("candidates", []),
+        "risk": values.get("risk"),
+        "aliases": values.get("aliases", {}),
+        "triggers": values.get("triggers", []),
+    }
 
 
 async def get_case(pool: AsyncConnectionPool, case_id: str) -> dict | None:
@@ -223,14 +431,7 @@ async def save_progress(
                 Jsonb(metrics),
                 Jsonb(values.get("verification")),
                 Jsonb(values.get("case_graph")),
-                Jsonb(
-                    {
-                        "hypothesis": values.get("hypothesis"),
-                        "candidates": values.get("candidates", []),
-                        "risk": values.get("risk"),
-                        "aliases": values.get("aliases", {}),
-                    }
-                ),
+                Jsonb(_analysis(values)),
                 values.get("provider"),
                 values.get("model"),
                 values.get("prompt_version"),

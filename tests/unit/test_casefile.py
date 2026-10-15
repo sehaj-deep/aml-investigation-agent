@@ -119,3 +119,32 @@ def test_case_file_reports_risk_indicators(case_file):
     assert cf.risk["band"] in {"low", "medium", "high"}
     assert cf.risk["subject"]["rules"] == ["R2", "R3", "R4", "R5"]
     assert "Risk indicators (rules; score" in cf.text
+
+
+def test_monitoring_alert_starts_with_why_it_was_raised(case_file):
+    _, client = case_file
+    alert = {
+        **ALERT,
+        "detection_score": 0.97,
+        "detection_rank": 3,
+        "priority": "high",
+        "trigger_tx_ids": [1, 8],
+        "detection_factors": [
+            {"feature": "format_wire", "label": "wire transfer", "value": 1.0, "contribution": 2.0}
+        ],
+    }
+    cf = asyncio.run(build_case_file(client, alert))
+    assert "WHY THIS ALERT WAS RAISED" in cf.text
+    assert "Priority high, score 0.970 (rank 3 in the queue)." in cf.text
+    assert "wire transfer (1)" in cf.text
+    assert [t["tx_id"] for t in cf.triggers] == [1, 8]
+    assert cf.triggers[0]["from_label"] == "A0"
+    assert {1, 8} <= set(cf.seen_tx_ids)
+    # Payment format is shown on the flagged payments.
+    assert "paid 100 US Dollar, Wire" in cf.text
+
+
+def test_label_built_alert_has_no_monitoring_section(case_file):
+    cf, _ = case_file
+    assert "WHY THIS ALERT WAS RAISED" not in cf.text
+    assert cf.triggers == []

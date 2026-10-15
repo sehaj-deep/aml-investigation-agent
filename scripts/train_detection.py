@@ -10,11 +10,16 @@ predictive in this simulator). Both are compared with the red-flag rules.
 Outputs:
 - data/detection/model.json and model-no-format.json (gitignored);
 - evals/runs/detection/model-<stamp>.json: test-period metrics;
-- evals/alerts/detection/alerts.jsonl: an alert queue for the investigation
-  evaluation. An account is alerted when any of its test-period transactions scores
-  above the threshold chosen on validation; a seeded sample of those accounts is
-  written, each with its triggering transactions and the factors behind the top one;
-- evals/alerts/detection/ground_truth.jsonl: their labels, kept apart from the alerts.
+- data/alert_queue/alerts.jsonl (gitignored, no labels): the queue the platform serves. The
+  alert threshold is set on validation to catch 84% of laundering accounts at an
+  industry-typical false-alarm rate. An account is alerted when any of its test-period
+  transactions reaches it. Each alert carries a priority band (which only orders the
+  work), its triggering transactions and the factors behind the strongest. A seeded
+  below-the-line sample of accounts just under the threshold is added for review;
+- evals/alerts/detection/alerts.jsonl: a seeded sample of the queue for the
+  investigation evaluation, an equal number from each priority band;
+- data/detection/ground_truth.jsonl and evals/alerts/detection/ground_truth.jsonl:
+  labels, kept apart from the alerts.
 Accounts of the frozen label-built evaluation set are excluded from training and
 validation. No language model is used.
 """
@@ -196,40 +201,80 @@ def main() -> None:
     results.append(evaluate("rules", rules_score(validation), validation, rules_score(test), test))
 
     booster, val_scores, test_scores = models["model"]
-    threshold = dm.best_threshold(val_scores, validation.y)
     accounts, acc_scores, acc_y = account_scores(con, test, test_scores)
     rules_accounts, rules_acc, _ = account_scores(con, test, rules_score(test))
     assert rules_accounts == accounts
     gain = booster.get_score(importance_type="gain")
     importance = sorted(gain.items(), key=lambda kv: -kv[1])[:15]
 
-    # Alert queue: every account with a transaction above the threshold.
-    flagged = test_scores >= threshold
-    queue = [int(i) for i in np.argsort(-acc_scores, kind="stable") if acc_scores[i] >= threshold]
-    rng = np.random.default_rng(args.seed)
-    sample = sorted(
-        (int(i) for i in rng.choice(queue, size=min(args.alerts, len(queue)), replace=False)),
+    # Alert policy from validation (dm.RECALL_TARGET): the threshold catches that share
+    # of laundering accounts; bands order the work. An account takes the band of its
+    # strongest transaction.
+    _, val_acc, val_acc_y = account_scores(con, validation, val_scores)
+    alert_threshold = dm.recall_threshold(val_acc, val_acc_y, dm.RECALL_TARGET)
+    btl_floor = dm.recall_threshold(val_acc, val_acc_y, dm.BTL_FLOOR_RECALL)
+    bands = [
+        (band, dm.precision_threshold(val_scores, validation.y, p)) for band, p in dm.PRIORITY_BANDS
+    ] + [("low", alert_threshold)]
+
+    def band_of(score: float) -> str:
+        return next(band for band, t in bands if score >= t)
+
+    ranked = np.argsort(-acc_scores, kind="stable")
+    queue = [int(i) for i in ranked if acc_scores[i] >= alert_threshold]
+    zone = [int(i) for i in ranked if btl_floor <= acc_scores[i] < alert_threshold]
+    btl_rng = np.random.default_rng(args.seed + 1)
+    btl = sorted(
+        (int(i) for i in btl_rng.choice(zone, size=min(dm.BTL_SAMPLE, len(zone)), replace=False)),
         key=lambda i: -acc_scores[i],
     )
-    rank_of = {i: r for r, i in enumerate(queue, start=1)}
+    entries = [(i, band_of(float(acc_scores[i]))) for i in queue] + [(i, "sample") for i in btl]
+
     tx_rows: dict[tuple[int, str], list[int]] = {}
-    for j in np.flatnonzero(flagged):
+    for j in np.flatnonzero(test_scores >= btl_floor):
         tx_rows.setdefault(test.sender[j], []).append(int(j))
         if test.receiver[j] != test.sender[j]:
             tx_rows.setdefault(test.receiver[j], []).append(int(j))
-    triggers = {
-        i: sorted(tx_rows[accounts[i]], key=lambda j: -test_scores[j])[:MAX_TRIGGERS]
-        for i in sample
-    }
-    factors = dm.top_factors(booster, test, [triggers[i][0] for i in sample])
+
+    def top_payments(i: int, kind: str) -> list[int]:
+        # An alert's triggers pass the alert threshold; a sample account's are its
+        # strongest payments, all below it.
+        floor = btl_floor if kind == "sample" else alert_threshold
+        rows = [j for j in tx_rows[accounts[i]] if test_scores[j] >= floor]
+        return sorted(rows, key=lambda j: -test_scores[j])[:MAX_TRIGGERS]
+
+    triggers = {i: top_payments(i, kind) for i, kind in entries}
+    factors = dm.top_factors(booster, test, [triggers[i][0] for i, _ in entries])
+    print(f"alert queue: {len(queue)} accounts, below-the-line sample {len(btl)}", flush=True)
+
+    con.execute("CREATE OR REPLACE TEMP TABLE queue_accounts (b INTEGER, a VARCHAR)")
+    con.executemany("INSERT INTO queue_accounts VALUES (?, ?)", [accounts[i] for i, _ in entries])
+    period_start, period_end = dm.TEST_PERIOD
+    blocks_of: dict[tuple[int, str], list[int]] = {}
+    for b, a, block in con.execute(
+        """
+        WITH members AS (
+            SELECT t.from_bank AS b, t.from_account AS a, pt.block_id
+            FROM pattern_transactions pt JOIN transactions t USING (tx_id)
+            WHERE t.ts BETWEEN $start AND $end
+            UNION
+            SELECT t.to_bank, t.to_account, pt.block_id
+            FROM pattern_transactions pt JOIN transactions t USING (tx_id)
+            WHERE t.ts BETWEEN $start AND $end
+        )
+        SELECT b, a, block_id FROM members JOIN queue_accounts USING (b, a)
+        ORDER BY 1, 2, 3
+        """,
+        {"start": period_start, "end": period_end},
+    ).fetchall():
+        blocks_of.setdefault((b, a), []).append(block)
 
     alert_lines, truth_lines = [], []
-    period_start, period_end = dm.TEST_PERIOD
-    for n, (i, f) in enumerate(zip(sample, factors, strict=True), start=1):
+    for rank, ((i, kind), f) in enumerate(zip(entries, factors, strict=True), start=1):
         bank, acct = accounts[i]
         rows = triggers[i]
         times = [test.ts[j].astype("datetime64[m]").astype(datetime) for j in rows]
-        alert_id = f"det-{n:04d}"
+        alert_id = f"BTL-{rank - len(queue):05d}" if kind == "sample" else f"ALR-{rank:05d}"
         alert_lines.append(
             {
                 "alert_id": alert_id,
@@ -238,24 +283,13 @@ def main() -> None:
                 "window_start": max(min(times) - WINDOW_PAD, period_start).isoformat(),
                 "window_end": min(max(times) + WINDOW_PAD, period_end).isoformat(),
                 "detection_score": round(float(acc_scores[i]), 5),
-                "detection_rank": rank_of[i],
+                "detection_rank": rank,
+                "priority": kind,
                 "trigger_tx_ids": [int(test.tx_id[j]) for j in rows],
                 "detection_factors": f,
             }
         )
-        blocks = [
-            r[0]
-            for r in con.execute(
-                """
-                SELECT DISTINCT pt.block_id FROM pattern_transactions pt
-                JOIN transactions t USING (tx_id)
-                WHERE t.ts BETWEEN ? AND ? AND ((t.from_bank = ? AND t.from_account = ?)
-                   OR (t.to_bank = ? AND t.to_account = ?))
-                ORDER BY 1
-                """,
-                [period_start, period_end, bank, acct, bank, acct],
-            ).fetchall()
-        ]
+        blocks = blocks_of.get((bank, acct), [])
         truth_lines.append(
             {
                 "alert_id": alert_id,
@@ -265,11 +299,52 @@ def main() -> None:
                 "other_laundering_only": bool(acc_y[i]) and not blocks,
             }
         )
-    ALERTS.mkdir(parents=True, exist_ok=True)
-    for name, lines in (("alerts.jsonl", alert_lines), ("ground_truth.jsonl", truth_lines)):
-        (ALERTS / name).write_text(
-            "".join(json.dumps(x) + "\n" for x in lines), encoding="utf-8", newline="\n"
-        )
+
+    def write(path: Path, lines: list[dict]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        text = "".join(json.dumps(x) + "\n" for x in lines)
+        path.write_text(text, encoding="utf-8", newline="\n")
+
+    # The full queue feeds the platform (gitignored, like the model); a seeded sample of
+    # it is the investigation evaluation set.
+    write(config.alert_queue_dir() / "alerts.jsonl", alert_lines)
+    write(model_dir / "ground_truth.jsonl", truth_lines)
+    rng = np.random.default_rng(args.seed)
+    sample = []
+    for band, _ in bands:  # alerts only; the below-the-line sample is reviewed apart
+        members = [k for k, x in enumerate(alert_lines) if x["priority"] == band]
+        size = min(args.alerts // len(bands), len(members))
+        sample += rng.choice(members, size=size, replace=False).tolist()
+    sample.sort()
+    write(ALERTS / "alerts.jsonl", [alert_lines[k] for k in sample])
+    write(ALERTS / "ground_truth.jsonl", [truth_lines[k] for k in sample])
+    by_band = {
+        band: {
+            "threshold": round(t, 5),
+            "alerts": sum(1 for x in alert_lines if x["priority"] == band),
+            "laundering": sum(
+                1
+                for x, y in zip(alert_lines, truth_lines, strict=True)
+                if x["priority"] == band and y["label"] == "positive"
+            ),
+        }
+        for band, t in bands
+    }
+    btl_truth = [
+        y for x, y in zip(alert_lines, truth_lines, strict=True) if x["priority"] == "sample"
+    ]
+    below_the_line = {
+        "zone": {
+            "from_score": round(btl_floor, 5),
+            "to_score": round(alert_threshold, 5),
+            "floor_recall_on_validation": dm.BTL_FLOOR_RECALL,
+            "accounts": len(zone),
+            "laundering_accounts": int(sum(acc_y[i] for i in zone)),
+        },
+        "sample": len(btl),
+        "sample_laundering": sum(1 for y in btl_truth if y["label"] == "positive"),
+        "seed": args.seed + 1,
+    }
 
     after = test.ts > np.datetime64(dm.PRIMARY_END)
     result = {
@@ -298,14 +373,27 @@ def main() -> None:
         "account_level_test": {
             "accounts": len(accounts),
             "laundering_accounts": int(acc_y.sum()),
-            "alerted_at_threshold": len(queue),
+            "alert_policy": {
+                "recall_target_on_validation": dm.RECALL_TARGET,
+                "threshold": round(alert_threshold, 5),
+            },
+            "alerted": len(queue),
             "alerted_laundering": int(sum(acc_y[i] for i in queue)),
+            "account_recall": round(sum(acc_y[i] for i in queue) / int(acc_y.sum()), 4),
+            "transaction_recall": round(
+                float(test.y[test_scores >= alert_threshold].sum() / test.y.sum()), 4
+            ),
+            "priority_bands": by_band,
+            "below_the_line_testing": below_the_line,
             "alert_budgets": budgets(acc_scores, acc_y, "model")
             + budgets(rules_acc, acc_y, "rules"),
         },
         "top_features_by_gain": [[k, round(v, 2)] for k, v in importance],
-        "alert_queue": {"sample": len(sample), "seed": args.seed},
-        "alerts_true": int(sum(1 for x in truth_lines if x["label"] == "positive")),
+        "evaluation_sample": {
+            "alerts": len(sample),
+            "seed": args.seed,
+            "laundering": sum(1 for k in sample if truth_lines[k]["label"] == "positive"),
+        },
         "seconds": round(time.perf_counter() - started, 1),
     }
     RUNS.mkdir(parents=True, exist_ok=True)
@@ -313,7 +401,7 @@ def main() -> None:
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({k: result[k] for k in ("rows", "transaction_level_test")}, indent=1))
     print(json.dumps(result["account_level_test"], indent=1))
-    print("alerts:", len(alert_lines), "true:", result["alerts_true"])
+    print("evaluation sample:", result["evaluation_sample"])
     print("top features:", result["top_features_by_gain"][:10])
     print(f"done in {result['seconds']} s; written {out}")
 

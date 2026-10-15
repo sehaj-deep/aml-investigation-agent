@@ -10,7 +10,8 @@ export default function Governance() {
       (acc, c) => {
         if (!c.model) return acc
         const key = `${c.model}|${c.prompt_version}`
-        acc[key] ??= { key, model: c.model, prompt: c.prompt_version ?? 'n/a', cases: 0 }
+        const version = c.prompt_version ? `Version ${c.prompt_version.replace(/^p/, '')}` : 'n/a'
+        acc[key] ??= { key, model: c.model, prompt: version, cases: 0 }
         acc[key].cases += 1
         return acc
       },
@@ -21,17 +22,36 @@ export default function Governance() {
     <div className="page">
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
-          Model governance
+          Governance
         </Typography.Title>
-        <Card size="small" title={<span className="panel-title">Models and prompt versions in use</span>}>
+        <Card size="small" title={<span className="panel-title">Transaction monitoring model</span>}>
+          <Descriptions size="small" column={1} bordered>
+            <Descriptions.Item label="Model">
+              Gradient-boosted trees (XGBoost, open source) scoring every payment from the payment
+              itself and the behavior of both accounts.
+            </Descriptions.Item>
+            <Descriptions.Item label="Alert policy">
+              Set to catch 84% of laundering accounts in the validation period, at about 93% false
+              alarms (typical for banks). Priority (high, medium, low) only orders the work.
+            </Descriptions.Item>
+            <Descriptions.Item label="Below-the-line testing">
+              A random sample of 250 accounts scored just under the threshold is reviewed like alerts,
+              to measure how much laundering the threshold misses.
+            </Descriptions.Item>
+            <Descriptions.Item label="Explanations">
+              Each alert shows the main reasons behind its score.
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+        <Card size="small" title={<span className="panel-title">AI review: models and instruction versions in use</span>}>
           <Table
             size="small"
             rowKey="key"
             pagination={false}
             dataSource={inventory}
             columns={[
-              { title: 'Model', dataIndex: 'model', render: (v) => <span className="mono">{v}</span> },
-              { title: 'Prompt version', dataIndex: 'prompt', render: (v) => <Tag>{v}</Tag> },
+              { title: 'AI model', dataIndex: 'model', render: (v) => <span className="mono">{v}</span> },
+              { title: 'Instructions', dataIndex: 'prompt', render: (v) => <Tag>{v}</Tag> },
               { title: 'Cases', dataIndex: 'cases', align: 'right' },
             ]}
           />
@@ -39,7 +59,8 @@ export default function Governance() {
         <Card size="small" title={<span className="panel-title">Controls in force</span>}>
           <Descriptions size="small" column={1} bordered>
             <Descriptions.Item label="Data access">
-              The AI reaches data only through read-only, bounded tools; it never sees labels.
+              The AI reads data only through read-only, limited lookups; it never sees the answers
+              used to test it.
             </Descriptions.Item>
             <Descriptions.Item label="Evidence">
               Supporting transactions are collected by the system from the accounts the AI identifies,
@@ -49,7 +70,8 @@ export default function Governance() {
               No case is closed without a recorded analyst decision; escalations require supervisor approval.
             </Descriptions.Item>
             <Descriptions.Item label="Audit">
-              Append-only, hash-chained log of every model call, tool call and decision.
+              Every AI step, data lookup and decision is recorded in a log that cannot be edited
+              and is checked for tampering.
             </Descriptions.Item>
             <Descriptions.Item label="Data">
               Synthetic transactions (IBM AMLworld HI-Small); results do not show real-world performance.

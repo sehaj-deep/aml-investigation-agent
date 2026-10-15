@@ -30,13 +30,13 @@ def test_committed_alert_files_parse_and_carry_no_labels(name):
     alerts = read_alerts(name)
     truth = read_truth(name)
     assert [a.alert_id for a in alerts] == [t.alert_id for t in truth]
-    assert set(Alert.model_fields) == {
-        "alert_id",
-        "seed_bank",
-        "seed_account",
-        "window_start",
-        "window_end",
-    }
+    labels = {"label", "is_laundering", "block_id", "pattern_type", "pattern_blocks"}
+    assert not labels & set(Alert.model_fields)
+    # The label-built sets carry only a seed and a window.
+    assert all(
+        a.detection_score is None and not a.trigger_tx_ids and not a.detection_factors
+        for a in alerts
+    )
 
 
 def test_set_sizes_and_balance():

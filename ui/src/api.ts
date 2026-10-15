@@ -9,13 +9,68 @@ export type CaseStatus =
   | 'rejected'
   | 'failed'
 
+export type Priority = 'high' | 'medium' | 'low' | 'sample'
+
+export interface DetectionFactor {
+  feature: string
+  label: string
+  value: number | null
+  contribution: number
+}
+
 export interface Alert {
   alert_id: string
   seed_bank: number
   seed_account: string
   window_start: string
   window_end: string
-  case_id?: string | null
+  detection_score?: number | null
+  detection_rank?: number | null
+  priority?: Priority | null
+  trigger_tx_ids?: number[]
+  detection_factors?: DetectionFactor[]
+}
+
+// A row of the alert queue: the alert plus the work status of its case.
+export type WorkStatus = CaseStatus | 'new'
+
+export interface QueueAlert {
+  alert_id: string
+  seed_bank: number
+  seed_account: string
+  window_start: string
+  window_end: string
+  score: number | null
+  rank: number | null
+  priority: Priority | null
+  n_triggers: number
+  reasons: DetectionFactor[] | null
+  case_id: string | null
+  status: WorkStatus
+  recommended_action: string | null
+  pattern: string | null
+}
+
+export interface AlertSummary {
+  total: number
+  by_priority: Record<string, number>
+  by_status: Record<string, number>
+}
+
+export interface Trigger {
+  tx_id: number
+  timestamp: string
+  from_bank: number
+  from_account: string
+  to_bank: number
+  to_account: string
+  amount_paid: string
+  currency_paid: string
+  amount_received: string
+  currency_received: string
+  payment_format?: string
+  from_label: string
+  to_label: string
 }
 
 export interface CaseRow {
@@ -134,6 +189,7 @@ export interface CaseDetail {
     candidates: Candidate[]
     aliases: Record<string, [number, string]>
     risk?: CaseRisk | null
+    triggers?: Trigger[]
   } | null
   error: string | null
   provider: string | null
@@ -166,7 +222,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  alerts: (set: 'dev' | 'eval' = 'dev') => request<Alert[]>(`/alerts?alert_set=${set}`),
+  alerts: (params: { priority?: string; status?: string; q?: string; limit: number; offset: number }) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
+    })
+    return request<{ total: number; items: QueueAlert[] }>(`/alerts?${qs}`)
+  },
+  alertSummary: () => request<AlertSummary>('/alerts/summary'),
+  openAlert: (alertId: string) =>
+    request<{ case_id: string; created: boolean }>(`/alerts/${alertId}/open`, { method: 'POST' }),
   cases: () => request<CaseRow[]>('/cases'),
   case: (id: string) => request<CaseDetail>(`/cases/${id}`),
   timeline: (id: string) =>
@@ -177,11 +242,6 @@ export const api = {
       events: { seq: number; event_type: string; actor: string; created_at: string; payload: Record<string, unknown> }[]
     }>(`/cases/${id}/audit`),
   stats: () => request<Stats>('/stats'),
-  openCase: (alertId: string) =>
-    request<{ case_id: string }>('/cases', {
-      method: 'POST',
-      body: JSON.stringify({ alert_id: alertId }),
-    }),
   decide: (id: string, action: Decision['action'], reason: string, reviewer: string) =>
     request<{ status: string }>(`/cases/${id}/decision`, {
       method: 'POST',

@@ -29,5 +29,12 @@ def parquet_dir() -> Path:
     return path if path.is_absolute() else REPO_ROOT / path
 
 
+def alert_queue_dir() -> Path:
+    """Folder with the monitoring alert queue (gitignored). It holds no labels, so the
+    API can mount it; the model and labels stay in data/detection."""
+    path = Path(os.environ.get("ALERT_QUEUE_DIR", "data/alert_queue"))
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
 def table_path(name: str) -> Path:
     return parquet_dir() / f"{name}.parquet"

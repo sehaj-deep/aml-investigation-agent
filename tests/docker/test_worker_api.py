@@ -16,7 +16,7 @@ import httpx
 import psycopg
 import pytest
 
-from aml_agent import store
+from aml_agent import config, store
 from tests.helpers import free_port, mcp_http_server, wait_for_port
 
 pytestmark = [pytest.mark.docker, pytest.mark.data]
@@ -37,11 +37,25 @@ def _prepare_test_db() -> bool:
         return False
 
 
+QUEUE_SAMPLE = 3
+
+
 @pytest.fixture(scope="module")
-def stack() -> Iterator[dict]:
+def stack(tmp_path_factory) -> Iterator[dict]:
     if not _prepare_test_db():
         pytest.skip("Postgres is not running (docker compose up -d)")
-    env = {"LLM_PROVIDER": "scripted", "LLM_SCRIPT_POLICY": "basic", "POSTGRES_DB": TEST_DB}
+    # A small monitoring queue: the first alerts of the real one (scripts/train_detection.py).
+    queue_dir = tmp_path_factory.mktemp("alert_queue")
+    real = config.alert_queue_dir() / "alerts.jsonl"
+    if real.exists():
+        lines = real.read_text(encoding="utf-8").splitlines()[:QUEUE_SAMPLE]
+        (queue_dir / "alerts.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    env = {
+        "LLM_PROVIDER": "scripted",
+        "LLM_SCRIPT_POLICY": "basic",
+        "POSTGRES_DB": TEST_DB,
+        "ALERT_QUEUE_DIR": str(queue_dir),
+    }
     with mcp_http_server() as mcp_url:
         port = free_port()
         api_env = {**os.environ, **env, "API_PORT": str(port)}
@@ -124,17 +138,32 @@ def test_api_rules(stack):
     assert httpx.get(f"{api}/cases/nope").status_code == 404
 
 
-def test_alert_list_serves_no_labels_and_stats_work(stack):
+def test_alert_queue_pages_and_opens_one_case_per_alert(stack):
     api = stack["api"]
-    alerts = httpx.get(f"{api}/alerts").json()
-    assert len(alerts) == 48
-    assert set(alerts[0]) == {
-        "alert_id",
-        "seed_bank",
-        "seed_account",
-        "window_start",
-        "window_end",
-        "case_id",
-    }
+    page = httpx.get(f"{api}/alerts", params={"limit": 2}).json()
+    if page["total"] == 0:
+        pytest.skip("no monitoring queue; run scripts/train_detection.py")
+    assert len(page["items"]) == min(2, page["total"])
+    ranks = [a["rank"] for a in page["items"]]
+    assert ranks == sorted(ranks)
+    labels = {"label", "is_laundering", "pattern_blocks", "true_triggers"}
+    assert not labels & set(page["items"][0])
+    alert_id = page["items"][0]["alert_id"]
+    first = httpx.post(f"{api}/alerts/{alert_id}/open").json()
+    again = httpx.post(f"{api}/alerts/{alert_id}/open").json()
+    assert again == {"case_id": first["case_id"], "created": False}
+    alert = httpx.get(f"{api}/alerts/{alert_id}").json()
+    assert alert["case_id"] == first["case_id"] and alert["status"] != "new"
+    assert not labels & set(alert["alert"])
+    case = httpx.get(f"{api}/cases/{first['case_id']}").json()
+    assert case["alert"]["trigger_tx_ids"] == alert["alert"]["trigger_tx_ids"]
+    summary = httpx.get(f"{api}/alerts/summary").json()
+    assert summary["total"] >= page["total"]
+    assert httpx.post(f"{api}/alerts/ALR-99999999/open").status_code == 404
+    assert httpx.get(f"{api}/alerts", params={"limit": 500}).status_code == 422
+
+
+def test_stats_work(stack):
+    api = stack["api"]
     stats = httpx.get(f"{api}/stats").json()
     assert set(stats) >= {"by_status", "by_recommended_action", "decisions", "verification"}

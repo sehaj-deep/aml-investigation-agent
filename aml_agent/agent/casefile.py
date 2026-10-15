@@ -60,6 +60,8 @@ class CaseFile:
     candidates: list[dict] = field(default_factory=list)
     # Rules-based risk score and reasons (aml_agent/analysis/risk.py).
     risk: dict = field(default_factory=dict)
+    # The payments transaction monitoring flagged, with account labels (for the UI).
+    triggers: list[dict] = field(default_factory=list)
 
 
 def _short(amount: str) -> str:
@@ -190,6 +192,16 @@ async def build_case_file(client: GraphClient, alert: dict) -> CaseFile:
             jurisdiction=summary["account"].get("jurisdiction"),
         )
 
+    # The payments transaction monitoring flagged come first: they are why the case exists.
+    triggers: list[dict] = []
+    if alert.get("trigger_tx_ids"):
+        got = await call("get_transactions", {"tx_ids": list(alert["trigger_tx_ids"])})
+        for t in (got or {}).get("transactions", []):
+            for acc in ((t["from_bank"], t["from_account"]), (t["to_bank"], t["to_account"])):
+                b.label(acc, hop=1)
+            b.tx_ids.append(t["tx_id"])
+            triggers.append(t)
+
     step1 = await call("get_neighbors", {**base, "direction": "both", "limit": SEED_NEIGHBOR_LIMIT})
     not_expanded: list[Account] = []
     if step1:
@@ -247,6 +259,37 @@ async def build_case_file(client: GraphClient, alert: dict) -> CaseFile:
             f"{s['n_tx']} tx, {_short(s['total'])} {s['currency']}" for s in summary["received"]
         )
         lines.append(f"Seed sent: {sent or 'nothing'}. Seed received: {received or 'nothing'}.")
+    if alert.get("detection_score") is not None:
+        lines.append("")
+        lines.append(
+            "WHY THIS ALERT WAS RAISED (transaction monitoring model; statistical reasons, "
+            "not proof; most alerts are false alarms):"
+        )
+        priority = alert.get("priority")
+        if priority == "sample":
+            priority = "sample (below-the-line: scored just under the alert threshold)"
+        lines.append(
+            f"Priority {priority}, score {alert['detection_score']:.3f} "
+            f"(rank {alert.get('detection_rank')} in the queue)."
+        )
+        reasons = "; ".join(
+            f["label"] + ("" if f.get("value") is None else f" ({f['value']:g})")
+            for f in alert.get("detection_factors") or []
+        )
+        lines.append(f"Main reasons for the strongest flagged payment: {reasons or 'not given'}.")
+        lines.append(f"Flagged payments ({len(triggers)}):")
+        for t in triggers:
+            src = b.aliases[(t["from_bank"], t["from_account"])]
+            dst = b.aliases[(t["to_bank"], t["to_account"])]
+            line = (
+                f"tx {t['tx_id']} {t['timestamp']} {src} -> {dst}: "
+                f"paid {_short(t['amount_paid'])} {t['currency_paid']}"
+            )
+            if t["currency_received"] != t["currency_paid"]:
+                line += f", received {_short(t['amount_received'])} {t['currency_received']}"
+            if t.get("payment_format"):
+                line += f", {t['payment_format']}"
+            lines.append(line)
     lines.append("")
     lines.append(
         "Accounts (label = bank_id/account, jurisdiction; step from the seed; "
@@ -364,6 +407,14 @@ async def build_case_file(client: GraphClient, alert: dict) -> CaseFile:
         seen_tx_ids=list(dict.fromkeys(b.tx_ids)),
         seen_accounts=list(b.aliases),
         tool_log=log,
+        triggers=[
+            {
+                **t,
+                "from_label": b.aliases[(t["from_bank"], t["from_account"])],
+                "to_label": b.aliases[(t["to_bank"], t["to_account"])],
+            }
+            for t in triggers
+        ],
     )
 
 

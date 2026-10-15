@@ -215,6 +215,37 @@ def best_threshold(scores: np.ndarray, y: np.ndarray) -> float:
     return float(sorted_scores[int(np.argmax(f1))])
 
 
+def precision_threshold(scores: np.ndarray, y: np.ndarray, min_precision: float) -> float:
+    """The lowest score at which the transactions scored at or above it still reach
+    `min_precision` (the deepest cut of the ranking with that precision)."""
+    sorted_scores, precision, _, _ = f1_curve(scores, y)
+    return float(sorted_scores[int(np.max(np.nonzero(precision >= min_precision)[0]))])
+
+
+def recall_threshold(scores: np.ndarray, y: np.ndarray, target: float) -> float:
+    """The highest score at or above which `target` of the positives are caught."""
+    order = np.argsort(-scores, kind="stable")
+    caught = np.cumsum(y[order]) / max(int(y.sum()), 1)
+    return float(scores[order][int(np.argmax(caught >= target - 1e-12))])
+
+
+# Alert policy, set on validation, the way banks tune transaction monitoring: catch as
+# much laundering as possible at a false-alarm rate a team can work (in industry about
+# 90 to 95% of alerts are false). The threshold catches RECALL_TARGET of laundering
+# accounts, at about 93% false alerts (98% would need three times the alerts at 97.6%
+# false). Priority bands only order the work: high and medium are the scores at which
+# at least 90% and 50% of the flagged transactions were laundering; every other alert
+# is low.
+RECALL_TARGET = 0.84
+PRIORITY_BANDS = (("high", 0.9), ("medium", 0.5))
+
+# Below-the-line testing: a random sample of the accounts just under the threshold
+# (down to the score that would catch BTL_FLOOR_RECALL) is reviewed like alerts, to
+# measure what the threshold misses.
+BTL_FLOOR_RECALL = 0.95
+BTL_SAMPLE = 250
+
+
 def train(train_set: Dataset, validation: Dataset, with_format: bool) -> xgb.Booster:
     cols = columns(with_format)
     names = [ALL_FEATURES[i] for i in cols]
